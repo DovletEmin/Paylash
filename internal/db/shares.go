@@ -118,6 +118,37 @@ func (d *DB) GetSharedWithMe(userID int, groupID *int) ([]models.SharedFileView,
 	return list, rows.Err()
 }
 
+func (d *DB) GetSharedByMe(userID int) ([]models.SharedByMeView, error) {
+	q := `SELECT DISTINCT ON (f.id)
+			f.id, f.name, f.mime_type, f.size_bytes, f.minio_bucket, f.minio_key,
+			f.folder_id, f.owner_id, f.group_id, f.scope, f.visibility, f.version, f.created_at, f.updated_at,
+			COALESCE(u.display_name, u.username, '') AS shared_with_name,
+			fs.permission,
+			fs.created_at AS shared_at
+		FROM file_shares fs
+		JOIN files f ON f.id = fs.file_id
+		LEFT JOIN users u ON u.id = fs.shared_with
+		WHERE fs.shared_by = $1 AND fs.shared_with IS NOT NULL
+		ORDER BY f.id, fs.created_at DESC`
+
+	rows, err := d.Query(q, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var list []models.SharedByMeView
+	for rows.Next() {
+		var sv models.SharedByMeView
+		if err := rows.Scan(&sv.ID, &sv.Name, &sv.MimeType, &sv.SizeBytes, &sv.MinioBucket, &sv.MinioKey,
+			&sv.FolderID, &sv.OwnerID, &sv.GroupID, &sv.Scope, &sv.Visibility, &sv.Version, &sv.CreatedAt, &sv.UpdatedAt,
+			&sv.SharedWithName, &sv.Permission, &sv.SharedAt); err != nil {
+			return nil, err
+		}
+		list = append(list, sv)
+	}
+	return list, rows.Err()
+}
+
 func (d *DB) CanAccessFile(fileID, userID int, groupID *int, requiredPerm string) (bool, error) {
 	// Owner always has access
 	var ownerID int

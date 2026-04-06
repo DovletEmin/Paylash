@@ -207,6 +207,19 @@ func (h *Handler) SharedWithMe(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, list)
 }
 
+func (h *Handler) SharedByMe(w http.ResponseWriter, r *http.Request) {
+	user := authutil.GetUser(r)
+	list, err := h.db.GetSharedByMe(user.ID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "paýlaşylan faýllary alyp bolmady")
+		return
+	}
+	if list == nil {
+		list = []models.SharedByMeView{}
+	}
+	writeJSON(w, http.StatusOK, list)
+}
+
 func (h *Handler) GetSharesForFile(w http.ResponseWriter, r *http.Request) {
 	user := authutil.GetUser(r)
 	fileID, err := strconv.Atoi(r.PathValue("id"))

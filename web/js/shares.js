@@ -3,17 +3,52 @@ const SharesPage = {
     renderSharedWithMe() {
         return `
         <div>
-            <div id="shared-content">${UI.skeletonCards(6)}</div>
+            <h3 style="font-size:1rem;font-weight:600;margin-bottom:12px">📤 Meniň paýlaşanlarym</h3>
+            <div id="shared-by-me-content">${UI.skeletonCards(3)}</div>
+            <h3 style="font-size:1rem;font-weight:600;margin:24px 0 12px">📥 Maňa paýlaşylanlar</h3>
+            <div id="shared-content">${UI.skeletonCards(3)}</div>
         </div>`;
     },
 
     async initSharedWithMe() {
+        this.loadSharedByMe();
+        this.loadSharedWithMe();
+    },
+
+    async loadSharedByMe() {
+        const c = document.getElementById('shared-by-me-content');
+        if (!c) return;
+        try {
+            const files = (await API.sharing.sharedByMe()) || [];
+            if (!files.length) {
+                c.innerHTML = '<p class="text-muted" style="font-size:.85rem">Heniz hiç kime faýl paýlaşmadyňyz</p>';
+                return;
+            }
+            let h = '<div class="file-grid">';
+            for (const f of files) {
+                const icon = UI.fileIcon(f.name, false);
+                const dbl = UI.isMediaPreviewable(f.name) ? `PreviewPage.open(${f.id},'${UI.esc(f.name)}')`
+                    : UI.isCollaboraViewable(f.name) ? `EditorPage.open(${f.id},'${UI.esc(f.name)}')` : `FilesPage.download(${f.id},'${UI.esc(f.name)}')`;
+                h += `<div class="file-card" ondblclick="${dbl}">
+                    <div class="file-card-icon document">${icon}</div>
+                    <div class="file-card-name" title="${UI.esc(f.name)}">${UI.esc(f.name)}</div>
+                    <div class="file-card-meta">${UI.formatBytes(f.size_bytes || 0)}${f.shared_with_name ? ' → ' + UI.esc(f.shared_with_name) : ''}</div>
+                    <div class="file-card-badge">${f.permission === 'edit' ? '✏️ Redaktirläp bolýar' : '👁 Diňe görmek'}</div>
+                </div>`;
+            }
+            c.innerHTML = h + '</div>';
+        } catch (err) {
+            c.innerHTML = `<p class="text-muted">${UI.esc(err.message)}</p>`;
+        }
+    },
+
+    async loadSharedWithMe() {
         const c = document.getElementById('shared-content');
         if (!c) return;
         try {
             const files = (await API.sharing.sharedWithMe()) || [];
             if (!files.length) {
-                c.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🔗</div><p>Heniz hiç zat paýlaşylmadyk</p><p class="text-muted">Beýleki ulanyjylar size faýl paýlaşanda şu ýerde görüner</p></div>';
+                c.innerHTML = '<p class="text-muted" style="font-size:.85rem">Heniz hiç kim size faýl paýlaşmadyk</p>';
                 return;
             }
             let h = '<div class="file-grid">';
@@ -30,7 +65,7 @@ const SharesPage = {
             }
             c.innerHTML = h + '</div>';
         } catch (err) {
-            c.innerHTML = `<div class="empty-state"><p>Ýükläp bolmady</p><p class="text-muted">${UI.esc(err.message)}</p></div>`;
+            c.innerHTML = `<p class="text-muted">${UI.esc(err.message)}</p>`;
         }
     },
 

@@ -162,9 +162,16 @@ type AdminDashboard struct {
 
 type SharedFileView struct {
 	File
-	SharedByName string `json:"owner_name"`
-	Permission   string `json:"permission"`
+	SharedByName string    `json:"owner_name"`
+	Permission   string    `json:"permission"`
 	SharedAt     time.Time `json:"shared_at"`
+}
+
+type SharedByMeView struct {
+	File
+	SharedWithName string    `json:"shared_with_name"`
+	Permission     string    `json:"permission"`
+	SharedAt       time.Time `json:"shared_at"`
 }
 
 type UserSearchResult struct {

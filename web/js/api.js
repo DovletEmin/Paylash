@@ -113,6 +113,7 @@ const API = {
             return API._request('PATCH', `/api/files/${fileId}/visibility`, { visibility });
         },
         sharedWithMe() { return API._request('GET', '/api/shared-with-me'); },
+        sharedByMe() { return API._request('GET', '/api/shared-by-me'); },
         getFileShares(fileId) { return API._request('GET', `/api/files/${fileId}/shares`); },
         searchUsers(q) { return API._request('GET', `/api/users/search?q=${encodeURIComponent(q)}`); },
     },

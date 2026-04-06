@@ -72,6 +72,7 @@ func (s *Server) routes(webFS embed.FS) {
 	s.mux.Handle("PATCH /api/files/{id}/share/public", auth(http.HandlerFunc(h.SetPublicShare)))
 	s.mux.Handle("PATCH /api/files/{id}/visibility", auth(http.HandlerFunc(h.SetVisibility)))
 	s.mux.Handle("GET /api/shared-with-me", auth(http.HandlerFunc(h.SharedWithMe)))
+	s.mux.Handle("GET /api/shared-by-me", auth(http.HandlerFunc(h.SharedByMe)))
 	s.mux.Handle("GET /api/files/{id}/shares", auth(http.HandlerFunc(h.GetSharesForFile)))
 	s.mux.Handle("GET /api/users/search", auth(http.HandlerFunc(h.SearchUsers)))
 
