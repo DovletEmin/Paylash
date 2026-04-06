@@ -153,7 +153,7 @@ func (d *DB) GetStorageUsage(ownerID int, scope string, groupID *int) (*models.S
 		return su, err
 	}
 	if groupID != nil {
-		err := d.QueryRow(`SELECT COALESCE(SUM(size_bytes), 0) FROM files WHERE group_id = $1 AND scope = 'group'`, *groupID).Scan(&su.UsedBytes)
+		err := d.QueryRow(`SELECT COALESCE(SUM(size_bytes), 0) FROM files WHERE (scope = 'group' AND group_id = $1) OR (visibility = 'group' AND owner_id IN (SELECT id FROM users WHERE group_id = $1))`, *groupID).Scan(&su.UsedBytes)
 		if err != nil {
 			return nil, err
 		}
