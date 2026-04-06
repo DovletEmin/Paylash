@@ -45,11 +45,34 @@ services:
     environment:
       - server_name=localhost
       - extra_params=--o:ssl.enable=false --o:net.proto=IPv4
-      - aliasgroup1=http://host.docker.internal:8080
+      - aliasgroup1=http://paylash-app:8080
     cap_add:
       - MKNOD
     extra_hosts:
       - "host.docker.internal:host-gateway"
+
+  app:
+    build: .
+    container_name: paylash-app
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      PAYLASH_PORT: "8080"
+      PAYLASH_DB_URL: "postgres://paylash:paylash_secret@postgres:5432/paylash?sslmode=disable"
+      PAYLASH_MINIO_ENDPOINT: "minio:9000"
+      PAYLASH_MINIO_ACCESS_KEY: "paylash"
+      PAYLASH_MINIO_SECRET_KEY: "paylash_secret"
+      PAYLASH_MINIO_USE_SSL: "false"
+      PAYLASH_COLLABORA_URL: "http://collabora:9980"
+      PAYLASH_JWT_SECRET: "paylash-production-secret"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      collabora:
+        condition: service_started
 
 volumes:
   postgres_data:
