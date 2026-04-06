@@ -11,18 +11,18 @@ func (d *DB) CreateUser(u *models.RegisterRequest, hash string) (*models.User, e
 	err := d.QueryRow(
 		`INSERT INTO users (username, password_hash, display_name, role, faculty_id, course_id, group_id)
 		 VALUES ($1, $2, $3, 'user', $4, $5, $6)
-		 RETURNING id, username, display_name, role, faculty_id, course_id, group_id, quota_bytes, created_at`,
+		 RETURNING id, username, display_name, role, faculty_id, course_id, group_id, quota_bytes, avatar_url, created_at`,
 		u.Username, hash, u.FullName, u.FacultyID, u.CourseID, u.GroupID,
-	).Scan(&user.ID, &user.Username, &user.DisplayName, &user.Role, &user.FacultyID, &user.CourseID, &user.GroupID, &user.QuotaBytes, &user.CreatedAt)
+	).Scan(&user.ID, &user.Username, &user.DisplayName, &user.Role, &user.FacultyID, &user.CourseID, &user.GroupID, &user.QuotaBytes, &user.AvatarURL, &user.CreatedAt)
 	return user, err
 }
 
 func (d *DB) GetUserByUsername(username string) (*models.User, error) {
 	u := &models.User{}
 	err := d.QueryRow(
-		`SELECT id, username, password_hash, display_name, role, faculty_id, course_id, group_id, quota_bytes, created_at
+		`SELECT id, username, password_hash, display_name, role, faculty_id, course_id, group_id, quota_bytes, avatar_url, created_at
 		 FROM users WHERE username = $1`, username,
-	).Scan(&u.ID, &u.Username, &u.PasswordHash, &u.DisplayName, &u.Role, &u.FacultyID, &u.CourseID, &u.GroupID, &u.QuotaBytes, &u.CreatedAt)
+	).Scan(&u.ID, &u.Username, &u.PasswordHash, &u.DisplayName, &u.Role, &u.FacultyID, &u.CourseID, &u.GroupID, &u.QuotaBytes, &u.AvatarURL, &u.CreatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -32,9 +32,9 @@ func (d *DB) GetUserByUsername(username string) (*models.User, error) {
 func (d *DB) GetUserByID(id int) (*models.User, error) {
 	u := &models.User{}
 	err := d.QueryRow(
-		`SELECT id, username, password_hash, display_name, role, faculty_id, course_id, group_id, quota_bytes, created_at
+		`SELECT id, username, password_hash, display_name, role, faculty_id, course_id, group_id, quota_bytes, avatar_url, created_at
 		 FROM users WHERE id = $1`, id,
-	).Scan(&u.ID, &u.Username, &u.PasswordHash, &u.DisplayName, &u.Role, &u.FacultyID, &u.CourseID, &u.GroupID, &u.QuotaBytes, &u.CreatedAt)
+	).Scan(&u.ID, &u.Username, &u.PasswordHash, &u.DisplayName, &u.Role, &u.FacultyID, &u.CourseID, &u.GroupID, &u.QuotaBytes, &u.AvatarURL, &u.CreatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -65,8 +65,8 @@ func (d *DB) SearchUsers(query string, limit int) ([]models.UserSearchResult, er
 }
 
 func (d *DB) ListUsers(facultyID, courseID, groupID int) ([]models.User, error) {
-	q := `SELECT id, username, display_name, role, faculty_id, course_id, group_id, quota_bytes, created_at
-	      FROM users WHERE role = 'user'`
+	q := `SELECT id, username, display_name, role, faculty_id, course_id, group_id, quota_bytes, avatar_url, created_at
+	      FROM users WHERE 1=1`
 	args := []any{}
 	n := 0
 	if facultyID > 0 {
@@ -94,7 +94,7 @@ func (d *DB) ListUsers(facultyID, courseID, groupID int) ([]models.User, error) 
 	var users []models.User
 	for rows.Next() {
 		var u models.User
-		if err := rows.Scan(&u.ID, &u.Username, &u.DisplayName, &u.Role, &u.FacultyID, &u.CourseID, &u.GroupID, &u.QuotaBytes, &u.CreatedAt); err != nil {
+		if err := rows.Scan(&u.ID, &u.Username, &u.DisplayName, &u.Role, &u.FacultyID, &u.CourseID, &u.GroupID, &u.QuotaBytes, &u.AvatarURL, &u.CreatedAt); err != nil {
 			return nil, err
 		}
 		users = append(users, u)
@@ -122,6 +122,11 @@ func (d *DB) UpdateDisplayName(id int, name string) error {
 
 func (d *DB) UpdatePassword(id int, hash string) error {
 	_, err := d.Exec(`UPDATE users SET password_hash = $1 WHERE id = $2`, hash, id)
+	return err
+}
+
+func (d *DB) UpdateAvatarURL(id int, url string) error {
+	_, err := d.Exec(`UPDATE users SET avatar_url = $1 WHERE id = $2`, url, id)
 	return err
 }
 
