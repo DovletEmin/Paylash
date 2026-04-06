@@ -213,9 +213,13 @@ func (h *Handler) AdminUpdateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req struct {
-		Role       string `json:"role"`
-		QuotaBytes int64  `json:"quota_bytes"`
-		GroupID    *int   `json:"group_id"`
+		Role        string `json:"role"`
+		QuotaBytes  int64  `json:"quota_bytes"`
+		GroupID     *int   `json:"group_id"`
+		FacultyID   *int   `json:"faculty_id"`
+		CourseID    *int   `json:"course_id"`
+		DisplayName string `json:"display_name"`
+		Password    string `json:"password"`
 	}
 	if err := readJSON(r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "nädogry maglumat")
@@ -224,7 +228,20 @@ func (h *Handler) AdminUpdateUser(w http.ResponseWriter, r *http.Request) {
 	if req.Role != "user" && req.Role != "admin" {
 		req.Role = "user"
 	}
-	if err := h.db.UpdateUser(id, req.Role, req.QuotaBytes, req.GroupID); err != nil {
+	var hash string
+	if req.Password != "" {
+		if len(req.Password) < 6 {
+			writeError(w, http.StatusBadRequest, "parol azyndan 6 simwol bolmaly")
+			return
+		}
+		h2, err := authutil.HashPassword(req.Password)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "ýalňyşlyk")
+			return
+		}
+		hash = h2
+	}
+	if err := h.db.UpdateUser(id, req.Role, req.QuotaBytes, req.GroupID, req.FacultyID, req.CourseID, req.DisplayName, hash); err != nil {
 		writeError(w, http.StatusInternalServerError, "üýtgedip bolmady")
 		return
 	}
@@ -305,10 +322,10 @@ func (h *Handler) AdminCreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if req.Role == "admin" {
-		h.db.UpdateUser(user.ID, "admin", user.QuotaBytes, user.GroupID)
+		h.db.UpdateUser(user.ID, "admin", user.QuotaBytes, user.GroupID, user.FacultyID, user.CourseID, user.DisplayName, "")
 	}
 	if req.QuotaMB > 0 {
-		h.db.UpdateUser(user.ID, req.Role, int64(req.QuotaMB)*1024*1024, user.GroupID)
+		h.db.UpdateUser(user.ID, req.Role, int64(req.QuotaMB)*1024*1024, user.GroupID, user.FacultyID, user.CourseID, user.DisplayName, "")
 	}
 	bucket := storage.PersonalBucket(user.ID)
 	h.minio.EnsureBucket(r.Context(), bucket)
@@ -455,7 +472,7 @@ func (h *Handler) AdminImportUsers(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if quotaMB > 0 {
-			h.db.UpdateUser(user.ID, "user", int64(quotaMB)*1024*1024, &groupID)
+			h.db.UpdateUser(user.ID, "user", int64(quotaMB)*1024*1024, &groupID, user.FacultyID, user.CourseID, user.DisplayName, "")
 		}
 
 		bucket := storage.PersonalBucket(user.ID)

@@ -102,10 +102,17 @@ func (d *DB) ListUsers(facultyID, courseID, groupID int) ([]models.User, error) 
 	return users, rows.Err()
 }
 
-func (d *DB) UpdateUser(id int, role string, quotaBytes int64, groupID *int) error {
+func (d *DB) UpdateUser(id int, role string, quotaBytes int64, groupID *int, facultyID *int, courseID *int, displayName string, passwordHash string) error {
+	if passwordHash != "" {
+		_, err := d.Exec(
+			`UPDATE users SET role=$1, quota_bytes=$2, group_id=$3, faculty_id=$4, course_id=$5, display_name=$6, password_hash=$7 WHERE id=$8`,
+			role, quotaBytes, groupID, facultyID, courseID, displayName, passwordHash, id,
+		)
+		return err
+	}
 	_, err := d.Exec(
-		`UPDATE users SET role = $1, quota_bytes = $2, group_id = $3 WHERE id = $4`,
-		role, quotaBytes, groupID, id,
+		`UPDATE users SET role=$1, quota_bytes=$2, group_id=$3, faculty_id=$4, course_id=$5, display_name=$6 WHERE id=$7`,
+		role, quotaBytes, groupID, facultyID, courseID, displayName, id,
 	)
 	return err
 }

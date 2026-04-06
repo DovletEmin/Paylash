@@ -268,24 +268,67 @@ const AdminPage = {
         } catch (e) { UI.toast(e.message, 'error'); }
     },
 
-    showEditUserModal(id) {
+    async showEditUserModal(id) {
         const u = this._users.find(x => x.id === id); if (!u) return;
         const mb = Math.round((u.quota_bytes || 0) / (1024 * 1024));
+        let facs = []; try { facs = (await API.admin.faculties.list()) || []; } catch {}
+        const fOpts = facs.map(f => `<option value="${f.id}" ${u.faculty_id === f.id ? 'selected' : ''}>${UI.esc(f.name)}</option>`).join('');
         UI.showModal('Ulanyjyny üýtget', `
             <div class="form-group"><label>Doly ady</label><input type="text" id="eu-name" value="${UI.esc(u.full_name)}" class="form-control"></div>
             <div class="form-group"><label>Täze parol</label>${UI.passwordField('eu-password', 'Boş goýsaň üýtgemez')}</div>
             <div class="form-group"><label>Rol</label><select id="eu-role" class="form-control"><option value="user" ${u.role==='user'?'selected':''}>Ulanyjy</option><option value="admin" ${u.role==='admin'?'selected':''}>Admin</option></select></div>
-            <div class="form-group"><label>Kwota (MB)</label><input type="number" id="eu-quota" value="${mb}" class="form-control" min="0"></div>`,
+            <div class="form-group"><label>Kwota (MB)</label><input type="number" id="eu-quota" value="${mb}" class="form-control" min="0"></div>
+            <div class="form-group"><label>Fakultet</label><select id="eu-faculty" class="form-control" onchange="AdminPage.onEditUserFacultyChange()"><option value="">Saýlaň…</option>${fOpts}</select></div>
+            <div class="form-group"><label>Ugur</label><select id="eu-course" class="form-control" disabled><option value="">Ilki fakultet saýlaň</option></select></div>
+            <div class="form-group"><label>Topar</label><select id="eu-group" class="form-control" disabled><option value="">Ilki ugur saýlaň</option></select></div>`,
             `<button class="btn btn-ghost" onclick="UI.closeModal()">Ýatyr</button><button class="btn btn-primary" onclick="AdminPage.saveUser(${id})">Ýatda sakla</button>`);
+        // Preload course and group if user already has faculty
+        if (u.faculty_id) {
+            try {
+                const cs = (await API.catalogs.courses(u.faculty_id)) || [];
+                const cEl = document.getElementById('eu-course');
+                if (cEl) {
+                    cEl.innerHTML = '<option value="">Ugur saýlaň…</option>' + cs.map(c => `<option value="${c.id}" ${u.course_id === c.id ? 'selected' : ''}>${UI.esc(c.name)}</option>`).join('');
+                    cEl.disabled = false;
+                }
+                if (u.course_id) {
+                    const gs = (await API.catalogs.groups(u.course_id)) || [];
+                    const gEl = document.getElementById('eu-group');
+                    if (gEl) {
+                        gEl.innerHTML = '<option value="">Topar saýlaň…</option>' + gs.map(g => `<option value="${g.id}" ${u.group_id === g.id ? 'selected' : ''}>${UI.esc(g.name)}</option>`).join('');
+                        gEl.disabled = false;
+                    }
+                }
+            } catch {}
+        }
+    },
+    async onEditUserFacultyChange() {
+        const fId = document.getElementById('eu-faculty').value;
+        const cEl = document.getElementById('eu-course'), gEl = document.getElementById('eu-group');
+        cEl.innerHTML = '<option value="">Ugur saýlaň…</option>'; cEl.disabled = true;
+        gEl.innerHTML = '<option value="">Ilki ugur saýlaň</option>'; gEl.disabled = true;
+        if (!fId) return;
+        try { const cs = (await API.catalogs.courses(fId)) || []; cEl.disabled = false; cs.forEach(c => { const o = document.createElement('option'); o.value = c.id; o.textContent = c.name; cEl.appendChild(o); }); } catch {}
+        cEl.onchange = async () => {
+            gEl.innerHTML = '<option value="">Topar saýlaň…</option>'; gEl.disabled = true;
+            const cId = cEl.value; if (!cId) return;
+            try { const gs = (await API.catalogs.groups(cId)) || []; gEl.disabled = false; gs.forEach(g => { const o = document.createElement('option'); o.value = g.id; o.textContent = g.name; gEl.appendChild(o); }); } catch {}
+        };
     },
     async saveUser(id) {
         const role = document.getElementById('eu-role').value;
         const mb = parseInt(document.getElementById('eu-quota').value) || 0;
         const name = document.getElementById('eu-name').value.trim();
         const password = document.getElementById('eu-password').value;
+        const facultyId = parseInt(document.getElementById('eu-faculty').value) || 0;
+        const courseId = parseInt(document.getElementById('eu-course').value) || 0;
+        const groupId = parseInt(document.getElementById('eu-group').value) || 0;
         const data = { role, quota_bytes: mb * 1024 * 1024 };
         if (name) data.display_name = name;
         if (password) data.password = password;
+        data.faculty_id = facultyId || null;
+        data.course_id = courseId || null;
+        data.group_id = groupId || null;
         try { await API.admin.users.update(id, data); UI.closeModal(); UI.toast('Üýtgedildi', 'success'); this.switchTab('users'); } catch (e) { UI.toast(e.message, 'error'); }
     },
     async deleteUser(id) {
