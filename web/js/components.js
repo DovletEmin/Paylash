@@ -52,6 +52,16 @@ const UI = {
 
     hideContextMenu() { document.getElementById('context-menu').classList.add('hidden'); },
 
+    passwordField(id, placeholder) {
+        return `<div class="pw-field"><input type="password" id="${id}" class="form-control" placeholder="${this.esc(placeholder || '')}"><button type="button" class="pw-toggle" onclick="UI.togglePw('${id}')" tabindex="-1">👁</button></div>`;
+    },
+
+    togglePw(id) {
+        const inp = document.getElementById(id);
+        if (!inp) return;
+        inp.type = inp.type === 'password' ? 'text' : 'password';
+    },
+
     esc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = s; return d.innerHTML; },
 
     formatBytes(b) {

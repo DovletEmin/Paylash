@@ -143,11 +143,13 @@ const App = {
 
     async loadStorageUsage() {
         try {
-            const d = await API.files.storageUsage();
+            const scope = (typeof FilesPage !== 'undefined') ? FilesPage.currentScope : 'personal';
+            const d = await API.files.storageUsage(scope);
             const bar = document.getElementById('storage-bar');
             if (!bar) return;
             const pct = d.quota_bytes > 0 ? Math.min((d.used_bytes / d.quota_bytes) * 100, 100) : 0;
-            bar.innerHTML = `<div class="storage-info"><span>${UI.formatBytes(d.used_bytes)} / ${UI.formatBytes(d.quota_bytes)}</span><span>${Math.round(pct)}%</span></div>
+            const label = scope === 'group' ? 'Topar' : scope === 'public' ? 'Umumy' : 'Şahsy';
+            bar.innerHTML = `<div class="storage-info"><span>${label}: ${UI.formatBytes(d.used_bytes)} / ${UI.formatBytes(d.quota_bytes)}</span><span>${Math.round(pct)}%</span></div>
                 <div class="storage-track"><div class="storage-fill ${pct > 90 ? 'danger' : pct > 70 ? 'warning' : ''}" style="width:${pct}%"></div></div>`;
         } catch {}
     },
@@ -167,8 +169,8 @@ const App = {
         UI.showModal('Profil', `
             <div class="form-group"><label>Doly ady</label><input type="text" id="prof-name" value="${UI.esc(u.full_name)}" class="form-control"></div>
             <hr style="border:none;border-top:1px solid var(--border);margin:12px 0">
-            <div class="form-group"><label>K\u00f6ne parol</label><input type="password" id="prof-old-pw" class="form-control" placeholder="Di\u0148e \u00fc\u00fdtgetmek \u00fc\u00e7in"></div>
-            <div class="form-group"><label>T\u00e4ze parol</label><input type="password" id="prof-new-pw" class="form-control" placeholder="Azyndan 6 simwol"></div>`,
+            <div class="form-group"><label>K\u00f6ne parol</label>${UI.passwordField('prof-old-pw', 'Di\u0148e \u00fc\u00fdtgetmek \u00fc\u00e7in')}</div>
+            <div class="form-group"><label>T\u00e4ze parol</label>${UI.passwordField('prof-new-pw', 'Azyndan 6 simwol')}</div>`,
             `<button class="btn btn-ghost" onclick="UI.closeModal()">\u00ddatyr</button><button class="btn btn-primary" onclick="App.saveProfile()">\u00ddatda sakla</button>`);
     },
 
