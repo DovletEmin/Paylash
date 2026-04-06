@@ -388,17 +388,19 @@ func (h *Handler) AdminImportUsers(w http.ResponseWriter, r *http.Request) {
 	created := 0
 
 	for i, row := range rows[1:] {
-		if len(row) < 4 {
-			results = append(results, importResult{Username: fmt.Sprintf("setir %d", i+2), Error: "ýeterlik sütün ýok"})
+		if len(row) < 6 {
+			results = append(results, importResult{Username: fmt.Sprintf("setir %d", i+2), Error: "ýeterlik sütün ýok (6 gerek)"})
 			continue
 		}
 		username := strings.TrimSpace(row[0])
 		password := strings.TrimSpace(row[1])
 		fullName := strings.TrimSpace(row[2])
-		groupID, _ := strconv.Atoi(strings.TrimSpace(row[3]))
+		facultyID, _ := strconv.Atoi(strings.TrimSpace(row[3]))
+		courseID, _ := strconv.Atoi(strings.TrimSpace(row[4]))
+		groupID, _ := strconv.Atoi(strings.TrimSpace(row[5]))
 		quotaMB := 10240
-		if len(row) >= 5 {
-			if q, err := strconv.Atoi(strings.TrimSpace(row[4])); err == nil && q > 0 {
+		if len(row) >= 7 {
+			if q, err := strconv.Atoi(strings.TrimSpace(row[6])); err == nil && q > 0 {
 				quotaMB = q
 			}
 		}
@@ -411,8 +413,8 @@ func (h *Handler) AdminImportUsers(w http.ResponseWriter, r *http.Request) {
 			results = append(results, importResult{Username: username, Error: "parol azyndan 6 simwol"})
 			continue
 		}
-		if groupID == 0 {
-			results = append(results, importResult{Username: username, Error: "topar ID girizilmeli"})
+		if facultyID == 0 || courseID == 0 || groupID == 0 {
+			results = append(results, importResult{Username: username, Error: "fakultet, kurs we topar ID girizilmeli"})
 			continue
 		}
 
@@ -428,19 +430,13 @@ func (h *Handler) AdminImportUsers(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		// Look up group to find faculty_id and course_id
-		grp, err := h.db.GetGroup(groupID)
-		if err != nil || grp == nil {
-			results = append(results, importResult{Username: username, Error: "topar tapylmady"})
-			continue
-		}
-
 		regReq := &models.RegisterRequest{
-			Username: username,
-			Password: password,
-			FullName: fullName,
-			GroupID:  groupID,
-			CourseID: grp.CourseID,
+			Username:  username,
+			Password:  password,
+			FullName:  fullName,
+			FacultyID: facultyID,
+			CourseID:  courseID,
+			GroupID:   groupID,
 		}
 		user, err := h.db.CreateUser(regReq, hash)
 		if err != nil {

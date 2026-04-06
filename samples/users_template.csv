@@ -1,4 +1,4 @@
-username,password,full_name,group_id,quota_mb
-student1,Password123,Aman Amanow,1,10240
-student2,Password123,Mergen Mergenow,1,10240
-student3,Password123,Jennet Babaýewa,2,10240
+username,password,full_name,faculty_id,course_id,group_id,quota_mb
+student1,Password123,Aman Amanow,1,1,1,10240
+student2,Password123,Mergen Mergenow,1,1,1,10240
+student3,Password123,Jennet Babaýewa,1,2,2,10240

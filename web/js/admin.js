@@ -299,7 +299,7 @@ const AdminPage = {
     showImportModal() {
         UI.showModal('Ulanyjylary import etmek', `
             <p class="text-muted" style="font-size:.82rem;margin-bottom:12px">CSV ýa-da XLSX faýly ýükläň. Faýl formaty:<br>
-            <code style="font-size:.75rem">username, password, full_name, group_id, quota_mb</code></p>
+            <code style="font-size:.75rem">username, password, full_name, faculty_id, course_id, group_id, quota_mb</code></p>
             <div class="form-group">
                 <input type="file" id="import-file" class="form-control" accept=".csv,.xlsx,.xls">
             </div>
