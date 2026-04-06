@@ -40,6 +40,10 @@ func (d *DB) ListFiles(ownerID int, groupID *int, scope string, folderID *int, s
 	if scope == "public" {
 		q = `SELECT id, name, mime_type, size_bytes, minio_bucket, minio_key, folder_id, owner_id, group_id, scope, visibility, version, created_at, updated_at FROM files WHERE visibility = 'public'`
 		n = 0
+	} else if scope == "group" && groupID != nil {
+		q = `SELECT id, name, mime_type, size_bytes, minio_bucket, minio_key, folder_id, owner_id, group_id, scope, visibility, version, created_at, updated_at FROM files WHERE ((scope = 'group' AND group_id = $1) OR (visibility = 'group' AND owner_id IN (SELECT id FROM users WHERE group_id = $1)))`
+		args = []any{*groupID}
+		n = 1
 	} else {
 		q = `SELECT id, name, mime_type, size_bytes, minio_bucket, minio_key, folder_id, owner_id, group_id, scope, visibility, version, created_at, updated_at FROM files WHERE scope = $1`
 		args = []any{scope}
@@ -49,10 +53,6 @@ func (d *DB) ListFiles(ownerID int, groupID *int, scope string, folderID *int, s
 			n++
 			q += ` AND owner_id = $` + strconv.Itoa(n)
 			args = append(args, ownerID)
-		} else if scope == "group" && groupID != nil {
-			n++
-			q += ` AND group_id = $` + strconv.Itoa(n)
-			args = append(args, *groupID)
 		}
 	}
 
