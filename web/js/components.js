@@ -93,6 +93,11 @@ const UI = {
         return ['doc','docx','odt','xls','xlsx','ods','ppt','pptx','odp'].includes(ext);
     },
 
+    isCollaboraViewable(name) {
+        const ext = name.split('.').pop().toLowerCase();
+        return ['doc','docx','odt','xls','xlsx','ods','ppt','pptx','odp','pdf'].includes(ext);
+    },
+
     skeletonCards(n) {
         let h = '<div class="file-grid">';
         for (let i = 0; i < n; i++) h += '<div class="file-card"><div class="skeleton" style="width:40px;height:40px;margin-bottom:10px"></div><div class="skeleton" style="width:75%;height:12px;margin-bottom:4px"></div><div class="skeleton" style="width:45%;height:10px"></div></div>';

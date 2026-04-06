@@ -96,7 +96,7 @@ const FilesPage = {
         const icon = UI.fileIcon(item.name, item.isFolder);
         const cls = UI.fileIconClass(item.name, item.isFolder);
         const dbl = item.isFolder ? `FilesPage.goToFolder(${item.id})`
-            : (UI.isCollaboraEditable(item.name) ? `EditorPage.open(${item.id},'${UI.esc(item.name)}')` : `FilesPage.download(${item.id},'${UI.esc(item.name)}')`);
+            : (UI.isCollaboraViewable(item.name) ? `EditorPage.open(${item.id},'${UI.esc(item.name)}')` : `FilesPage.download(${item.id},'${UI.esc(item.name)}')`);
         const itemJson = JSON.stringify(item).replace(/"/g, '&quot;');
         return `<div class="file-card" ondblclick="${dbl}" oncontextmenu="FilesPage.showMenu(event,${itemJson})">
             <div class="file-card-icon ${cls}">${icon}</div>
@@ -109,7 +109,7 @@ const FilesPage = {
         const icon = UI.fileIcon(item.name, item.isFolder);
         const cls = UI.fileIconClass(item.name, item.isFolder);
         const dbl = item.isFolder ? `FilesPage.goToFolder(${item.id})`
-            : (UI.isCollaboraEditable(item.name) ? `EditorPage.open(${item.id},'${UI.esc(item.name)}')` : `FilesPage.download(${item.id},'${UI.esc(item.name)}')`);
+            : (UI.isCollaboraViewable(item.name) ? `EditorPage.open(${item.id},'${UI.esc(item.name)}')` : `FilesPage.download(${item.id},'${UI.esc(item.name)}')`);
         const itemJson = JSON.stringify(item).replace(/"/g, '&quot;');
         return `<div class="file-list-row" ondblclick="${dbl}" oncontextmenu="FilesPage.showMenu(event,${itemJson})">
             <div class="file-list-name"><span class="file-list-icon ${cls}">${icon}</span>${UI.esc(item.name)}</div>
@@ -129,6 +129,7 @@ const FilesPage = {
             items.push({ action: 'delete', label: 'Poz', icon: '🗑', danger: true, handler: () => this.deleteFolder(item) });
         } else {
             if (UI.isCollaboraEditable(item.name)) items.push({ action: 'edit', label: 'Redaktirle', icon: '📝', handler: () => EditorPage.open(item.id, item.name) });
+            else if (UI.isCollaboraViewable(item.name)) items.push({ action: 'view', label: 'Açmak', icon: '👁', handler: () => EditorPage.open(item.id, item.name) });
             items.push({ action: 'download', label: 'Ýükle', icon: '📥', handler: () => this.download(item.id, item.name) });
             items.push({ action: 'share', label: 'Paýlaş', icon: '🔗', handler: () => SharesPage.showShareModal(item) });
             items.push({ action: 'rename', label: 'Adyny üýtget', icon: '✏️', handler: () => this.renameFile(item) });
