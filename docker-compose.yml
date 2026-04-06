@@ -1,0 +1,56 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: paylash-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: paylash
+      POSTGRES_USER: paylash
+      POSTGRES_PASSWORD: paylash_secret
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U paylash"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    container_name: paylash-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: paylash
+      MINIO_ROOT_PASSWORD: paylash_secret
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  collabora:
+    image: collabora/code:latest
+    container_name: paylash-collabora
+    restart: unless-stopped
+    ports:
+      - "9980:9980"
+    environment:
+      - server_name=localhost
+      - extra_params=--o:ssl.enable=false --o:net.proto=IPv4
+      - aliasgroup1=http://host.docker.internal:8080
+    cap_add:
+      - MKNOD
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+volumes:
+  postgres_data:
+  minio_data:
