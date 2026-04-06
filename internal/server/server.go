@@ -94,6 +94,7 @@ func (s *Server) routes(webFS embed.FS) {
 	s.mux.Handle("POST /api/admin/users", auth(AdminMiddleware(http.HandlerFunc(h.AdminCreateUser))))
 	s.mux.Handle("PATCH /api/admin/users/{id}", auth(AdminMiddleware(http.HandlerFunc(h.AdminUpdateUser))))
 	s.mux.Handle("DELETE /api/admin/users/{id}", auth(AdminMiddleware(http.HandlerFunc(h.AdminDeleteUser))))
+	s.mux.Handle("DELETE /api/admin/users/all", auth(AdminMiddleware(http.HandlerFunc(h.AdminDeleteAllUsers))))
 	s.mux.Handle("POST /api/admin/users/bulk-quota", auth(AdminMiddleware(http.HandlerFunc(h.AdminBulkUserQuota))))
 	s.mux.Handle("POST /api/admin/groups/bulk-quota", auth(AdminMiddleware(http.HandlerFunc(h.AdminBulkGroupQuota))))
 	s.mux.Handle("POST /api/admin/users/import", auth(AdminMiddleware(http.HandlerFunc(h.AdminImportUsers))))

@@ -201,6 +201,7 @@ const AdminPage = {
                 <div style="display:flex;gap:8px;align-items:center">
                     <input type="text" id="admin-user-search" class="form-control" placeholder="Gözle…" style="width:200px" oninput="AdminPage.filterUsers(this.value)">
                     <button class="btn btn-ghost btn-sm" onclick="AdminPage.showBulkUserQuota()">📊 Kwota hemmesine</button>
+                    <button class="btn btn-danger btn-sm" onclick="AdminPage.confirmDeleteAllUsers()">🗑 Hemmesini poz</button>
                     <button class="btn btn-ghost btn-sm" onclick="AdminPage.showImportModal()">📥 Import</button>
                     <button class="btn btn-primary btn-sm" onclick="AdminPage.showCreateUserModal()">${UI.icons.plus} Täze</button>
                 </div>
@@ -290,6 +291,19 @@ const AdminPage = {
     async deleteUser(id) {
         if (!confirm('Bu ulanyjyny pozmak isleýärsiňizmi?')) return;
         try { await API.admin.users.delete(id); UI.toast('Pozuldy', 'success'); this.switchTab('users'); } catch (e) { UI.toast(e.message, 'error'); }
+    },
+
+    confirmDeleteAllUsers() {
+        UI.showModal('Ähli ulanyjylary pozmak', `
+            <p style="color:var(--danger);font-weight:600">⚠️ Bu ähli ulanyjylary (admin-den başga) pozar!</p>
+            <p class="text-muted" style="font-size:.85rem">Bu hereket yzyna gaýtaryp bolmaz. Tassyklamak üçin aşakda "POZMAK" ýazyň.</p>
+            <div class="form-group"><input type="text" id="confirm-delete-all" class="form-control" placeholder='POZMAK ýazyň'></div>`,
+            `<button class="btn btn-ghost" onclick="UI.closeModal()">Ýatyr</button><button class="btn btn-danger" onclick="AdminPage.doDeleteAllUsers()">Hemmesini poz</button>`);
+    },
+    async doDeleteAllUsers() {
+        if (document.getElementById('confirm-delete-all').value.trim() !== 'POZMAK') { UI.toast('Tassyklamak üçin "POZMAK" ýazyň', 'error'); return; }
+        try { const res = await API.admin.users.deleteAll(); UI.closeModal(); UI.toast(`${res.deleted} ulanyjy pozuldy`, 'success'); this.switchTab('users'); }
+        catch (e) { UI.toast(e.message, 'error'); }
     },
 
     showBulkUserQuota() {

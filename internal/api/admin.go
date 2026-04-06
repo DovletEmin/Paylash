@@ -243,6 +243,16 @@ func (h *Handler) AdminDeleteUser(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
+
+func (h *Handler) AdminDeleteAllUsers(w http.ResponseWriter, r *http.Request) {
+	count, err := h.db.DeleteAllUsersExceptAdmin()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "pozup bolmady")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "deleted": count})
+}
+
 func (h *Handler) AdminCreateUser(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Username  string `json:"username"`

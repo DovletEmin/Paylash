@@ -158,6 +158,7 @@ const API = {
                 return API._request('PATCH', `/api/admin/users/${id}`, data);
             },
             delete(id) { return API._request('DELETE', `/api/admin/users/${id}`); },
+            deleteAll() { return API._request('DELETE', '/api/admin/users/all'); },
             bulkQuota(quotaMB) { return API._request('POST', '/api/admin/users/bulk-quota', { quota_mb: quotaMB }); },
             importFile(file) {
                 const form = new FormData();

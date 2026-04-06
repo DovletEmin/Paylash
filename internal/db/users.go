@@ -115,6 +115,14 @@ func (d *DB) DeleteUser(id int) error {
 	return err
 }
 
+func (d *DB) DeleteAllUsersExceptAdmin() (int64, error) {
+	res, err := d.Exec(`DELETE FROM users WHERE role != 'admin'`)
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
+}
+
 func (d *DB) UpdateDisplayName(id int, name string) error {
 	_, err := d.Exec(`UPDATE users SET display_name = $1 WHERE id = $2`, name, id)
 	return err
