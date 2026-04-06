@@ -174,7 +174,10 @@ const AdminPage = {
             const users = (await API.admin.users.list()) || [];
             el.innerHTML = `
             <div class="admin-header"><h2>Ulanyjylar</h2>
-                <div class="admin-search"><input type="text" id="admin-user-search" class="form-control" placeholder="Gözle…" oninput="AdminPage.filterUsers(this.value)"></div>
+                <div style="display:flex;gap:8px;align-items:center">
+                    <input type="text" id="admin-user-search" class="form-control" placeholder="Gözle…" style="width:200px" oninput="AdminPage.filterUsers(this.value)">
+                    <button class="btn btn-primary btn-sm" onclick="AdminPage.showCreateUserModal()">${UI.icons.plus} Täze</button>
+                </div>
             </div>
             <table class="admin-table" id="admin-users-table"><thead><tr><th>ID</th><th>Ady</th><th>Ulanyjy ady</th><th>Rol</th><th>Kwota</th><th>Hereketler</th></tr></thead><tbody>
             ${users.map(u => `<tr data-uid="${u.id}"><td>${u.id}</td><td>${UI.esc(u.full_name)}</td><td>@${UI.esc(u.username)}</td>
@@ -193,18 +196,70 @@ const AdminPage = {
         document.querySelectorAll('#admin-users-table tbody tr').forEach(r => { r.style.display = r.textContent.toLowerCase().includes(lc) ? '' : 'none'; });
     },
 
+    async showCreateUserModal() {
+        let facs = []; try { facs = (await API.admin.faculties.list()) || []; } catch {}
+        const fOpts = facs.map(f => `<option value="${f.id}">${UI.esc(f.name)}</option>`).join('');
+        UI.showModal('Täze ulanyjy', `
+            <div class="form-group"><label>Doly ady</label><input type="text" id="nu-name" class="form-control" placeholder="Ady we familiýasy"></div>
+            <div class="form-group"><label>Ulanyjy ady</label><input type="text" id="nu-username" class="form-control" placeholder="username"></div>
+            <div class="form-group"><label>Parol</label><input type="password" id="nu-password" class="form-control" placeholder="Azyndan 6 simwol"></div>
+            <div class="form-group"><label>Rol</label><select id="nu-role" class="form-control"><option value="user">Ulanyjy</option><option value="admin">Admin</option></select></div>
+            <div class="form-group"><label>Kwota (MB)</label><input type="number" id="nu-quota" class="form-control" value="10240" min="0"></div>
+            <div class="form-group"><label>Fakultet</label><select id="nu-faculty" class="form-control" onchange="AdminPage.onNewUserFacultyChange()"><option value="">Saýlaň…</option>${fOpts}</select></div>
+            <div class="form-group"><label>Ugur</label><select id="nu-course" class="form-control" disabled><option value="">Ilki fakultet saýlaň</option></select></div>
+            <div class="form-group"><label>Topar</label><select id="nu-group" class="form-control" disabled><option value="">Ilki ugur saýlaň</option></select></div>`,
+            `<button class="btn btn-ghost" onclick="UI.closeModal()">Ýatyr</button><button class="btn btn-primary" onclick="AdminPage.doCreateUser()">Döret</button>`);
+    },
+
+    async onNewUserFacultyChange() {
+        const fId = document.getElementById('nu-faculty').value;
+        const cEl = document.getElementById('nu-course'), gEl = document.getElementById('nu-group');
+        cEl.innerHTML = '<option value="">Ugur saýlaň…</option>'; cEl.disabled = true;
+        gEl.innerHTML = '<option value="">Ilki ugur saýlaň</option>'; gEl.disabled = true;
+        if (!fId) return;
+        try { const cs = (await API.catalogs.courses(fId)) || []; cEl.disabled = false; cs.forEach(c => { const o = document.createElement('option'); o.value = c.id; o.textContent = c.name; cEl.appendChild(o); }); } catch {}
+        cEl.onchange = async () => {
+            gEl.innerHTML = '<option value="">Topar saýlaň…</option>'; gEl.disabled = true;
+            const cId = cEl.value; if (!cId) return;
+            try { const gs = (await API.catalogs.groups(cId)) || []; gEl.disabled = false; gs.forEach(g => { const o = document.createElement('option'); o.value = g.id; o.textContent = g.name; gEl.appendChild(o); }); } catch {}
+        };
+    },
+
+    async doCreateUser() {
+        const name = document.getElementById('nu-name').value.trim();
+        const username = document.getElementById('nu-username').value.trim();
+        const password = document.getElementById('nu-password').value;
+        const role = document.getElementById('nu-role').value;
+        const quotaMB = parseInt(document.getElementById('nu-quota').value) || 0;
+        const facultyId = parseInt(document.getElementById('nu-faculty').value) || 0;
+        const courseId = parseInt(document.getElementById('nu-course').value) || 0;
+        const groupId = parseInt(document.getElementById('nu-group').value) || 0;
+        if (!name || !username || !password) { UI.toast('Ähli meýdanlary dolduryň', 'error'); return; }
+        try {
+            await API.admin.users.create({ full_name: name, username, password, role, quota_mb: quotaMB, faculty_id: facultyId, course_id: courseId, group_id: groupId });
+            UI.closeModal(); UI.toast('Ulanyjy döredildi', 'success'); this.switchTab('users');
+        } catch (e) { UI.toast(e.message, 'error'); }
+    },
+
     showEditUserModal(id) {
         const u = this._users.find(x => x.id === id); if (!u) return;
         const mb = Math.round((u.quota_bytes || 0) / (1024 * 1024));
-        UI.showModal('Ulanyjyny üýtget',
-            `<div class="form-group"><label>Doly ady</label><input type="text" id="eu-name" value="${UI.esc(u.full_name)}" class="form-control" disabled></div>
-             <div class="form-group"><label>Rol</label><select id="eu-role" class="form-control"><option value="user" ${u.role==='user'?'selected':''}>Ulanyjy</option><option value="admin" ${u.role==='admin'?'selected':''}>Admin</option></select></div>
-             <div class="form-group"><label>Kwota (MB)</label><input type="number" id="eu-quota" value="${mb}" class="form-control" min="0"></div>`,
-            `<button class="btn btn-ghost" onclick="UI.closeModal()">Ýatyrmak</button><button class="btn btn-primary" onclick="AdminPage.saveUser(${id})">Ýatda sakla</button>`);
+        UI.showModal('Ulanyjyny üýtget', `
+            <div class="form-group"><label>Doly ady</label><input type="text" id="eu-name" value="${UI.esc(u.full_name)}" class="form-control"></div>
+            <div class="form-group"><label>Täze parol</label><input type="password" id="eu-password" class="form-control" placeholder="Boş goýsaň üýtgemez"></div>
+            <div class="form-group"><label>Rol</label><select id="eu-role" class="form-control"><option value="user" ${u.role==='user'?'selected':''}>Ulanyjy</option><option value="admin" ${u.role==='admin'?'selected':''}>Admin</option></select></div>
+            <div class="form-group"><label>Kwota (MB)</label><input type="number" id="eu-quota" value="${mb}" class="form-control" min="0"></div>`,
+            `<button class="btn btn-ghost" onclick="UI.closeModal()">Ýatyr</button><button class="btn btn-primary" onclick="AdminPage.saveUser(${id})">Ýatda sakla</button>`);
     },
     async saveUser(id) {
-        const role = document.getElementById('eu-role').value, mb = parseInt(document.getElementById('eu-quota').value) || 0;
-        try { await API.admin.users.update(id, role, mb * 1024 * 1024); UI.closeModal(); UI.toast('Üýtgedildi', 'success'); this.switchTab('users'); } catch (e) { UI.toast(e.message, 'error'); }
+        const role = document.getElementById('eu-role').value;
+        const mb = parseInt(document.getElementById('eu-quota').value) || 0;
+        const name = document.getElementById('eu-name').value.trim();
+        const password = document.getElementById('eu-password').value;
+        const data = { role, quota_bytes: mb * 1024 * 1024 };
+        if (name) data.display_name = name;
+        if (password) data.password = password;
+        try { await API.admin.users.update(id, data); UI.closeModal(); UI.toast('Üýtgedildi', 'success'); this.switchTab('users'); } catch (e) { UI.toast(e.message, 'error'); }
     },
     async deleteUser(id) {
         if (!confirm('Bu ulanyjyny pozmak isleýärsiňizmi?')) return;

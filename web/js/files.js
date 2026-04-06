@@ -27,20 +27,17 @@ const FilesPage = {
                 <button class="btn btn-ghost btn-sm" onclick="FilesPage.showNewFolderModal()">${UI.icons.plus} Täze papka</button>
             </div>
             <div class="breadcrumbs" id="breadcrumbs"></div>
-            <div class="dropzone" id="dropzone">
-                <div class="dropzone-content">
-                    ${UI.icons.upload}
-                    <p>Faýllary şu ýere süýräň ýa-da <label for="file-input" class="dropzone-link">saýlaň</label></p>
-                    <input type="file" id="file-input" multiple style="display:none" onchange="FilesPage.handleFileSelect(this.files)">
-                </div>
-            </div>
+            <input type="file" id="file-input" multiple style="display:none" onchange="FilesPage.handleFileSelect(this.files)">
             <div id="upload-progress" class="upload-progress hidden"></div>
             <div id="files-content">${UI.skeletonCards(6)}</div>
-            <div id="storage-bar" class="storage-bar"></div>
+            <div class="drop-overlay hidden" id="drop-overlay">
+                <div class="drop-overlay-content">${UI.icons.upload}<p>Faýllary goýberiň</p></div>
+            </div>
         </div>`;
     },
 
-    async init() { await this.loadFiles(); this.initDragDrop(); this.loadStorageUsage(); },
+    async init() { await this.loadFiles(); this.initDragDrop(); },
+
 
     async loadFiles() {
         const c = document.getElementById('files-content');
@@ -172,16 +169,19 @@ const FilesPage = {
             }
         }
         setTimeout(() => { prog.innerHTML = ''; prog.classList.add('hidden'); }, 2000);
-        this.loadFiles(); this.loadStorageUsage();
+        this.loadFiles(); App.loadStorageUsage();
         document.getElementById('file-input').value = '';
     },
 
     initDragDrop() {
-        const dz = document.getElementById('dropzone'), pg = document.querySelector('.files-page');
-        if (!dz || !pg) return;
-        ['dragenter', 'dragover'].forEach(e => pg.addEventListener(e, ev => { ev.preventDefault(); dz.classList.add('active'); }));
-        ['dragleave', 'drop'].forEach(e => pg.addEventListener(e, ev => { ev.preventDefault(); dz.classList.remove('active'); }));
-        pg.addEventListener('drop', e => { if (e.dataTransfer.files.length) this.handleFileSelect(e.dataTransfer.files); });
+        const pg = document.querySelector('.files-page');
+        const ov = document.getElementById('drop-overlay');
+        if (!pg || !ov) return;
+        let dragCounter = 0;
+        pg.addEventListener('dragenter', ev => { ev.preventDefault(); dragCounter++; ov.classList.remove('hidden'); });
+        pg.addEventListener('dragover', ev => { ev.preventDefault(); });
+        pg.addEventListener('dragleave', ev => { ev.preventDefault(); dragCounter--; if (dragCounter <= 0) { dragCounter = 0; ov.classList.add('hidden'); } });
+        pg.addEventListener('drop', ev => { ev.preventDefault(); dragCounter = 0; ov.classList.add('hidden'); if (ev.dataTransfer.files.length) this.handleFileSelect(ev.dataTransfer.files); });
     },
 
     async download(id, name) {
@@ -221,7 +221,7 @@ const FilesPage = {
             `<p>"<strong>${UI.esc(item.name)}</strong>" faýlyny pozmak isleýärsiňizmi?</p><p class="text-muted">Bu yzyna gaýtaryp bolmaýar.</p>`,
             `<button class="btn btn-ghost" onclick="UI.closeModal()">Ýatyrmak</button><button class="btn btn-danger" onclick="FilesPage.doDeleteFile(${item.id})">Poz</button>`);
     },
-    async doDeleteFile(id) { try { await API.files.delete(id); UI.closeModal(); UI.toast('Faýl pozuldy', 'success'); this.loadFiles(); this.loadStorageUsage(); } catch (e) { UI.toast(e.message, 'error'); } },
+    async doDeleteFile(id) { try { await API.files.delete(id); UI.closeModal(); UI.toast('Faýl pozuldy', 'success'); this.loadFiles(); App.loadStorageUsage(); } catch (e) { UI.toast(e.message, 'error'); } },
 
     deleteFolder(item) {
         UI.showModal('Papkany pozmak',
@@ -240,14 +240,4 @@ const FilesPage = {
         try { await API.folders.create(n, this.currentScope, this.currentFolder); UI.closeModal(); UI.toast('Papka döredildi', 'success'); this.loadFiles(); } catch (e) { UI.toast(e.message, 'error'); }
     },
 
-    async loadStorageUsage() {
-        try {
-            const d = await API.files.storageUsage();
-            const bar = document.getElementById('storage-bar');
-            if (!bar) return;
-            const pct = d.quota_bytes > 0 ? Math.min((d.used_bytes / d.quota_bytes) * 100, 100) : 0;
-            bar.innerHTML = `<div class="storage-info"><span>${UI.formatBytes(d.used_bytes)} / ${UI.formatBytes(d.quota_bytes)}</span><span>${Math.round(pct)}%</span></div>
-                <div class="storage-track"><div class="storage-fill ${pct > 90 ? 'danger' : pct > 70 ? 'warning' : ''}" style="width:${pct}%"></div></div>`;
-        } catch {}
-    }
 };

@@ -48,6 +48,7 @@ func (s *Server) routes(webFS embed.FS) {
 
 	// Authenticated routes
 	s.mux.Handle("GET /api/auth/me", auth(http.HandlerFunc(h.Me)))
+	s.mux.Handle("PATCH /api/auth/profile", auth(http.HandlerFunc(h.UpdateProfile)))
 
 	// Files
 	s.mux.Handle("GET /api/files", auth(http.HandlerFunc(h.ListFiles)))
@@ -88,6 +89,7 @@ func (s *Server) routes(webFS embed.FS) {
 	s.mux.Handle("PATCH /api/admin/groups/{id}", auth(AdminMiddleware(http.HandlerFunc(h.AdminUpdateGroup))))
 	s.mux.Handle("DELETE /api/admin/groups/{id}", auth(AdminMiddleware(http.HandlerFunc(h.AdminDeleteGroup))))
 	s.mux.Handle("GET /api/admin/users", auth(AdminMiddleware(http.HandlerFunc(h.AdminListUsers))))
+	s.mux.Handle("POST /api/admin/users", auth(AdminMiddleware(http.HandlerFunc(h.AdminCreateUser))))
 	s.mux.Handle("PATCH /api/admin/users/{id}", auth(AdminMiddleware(http.HandlerFunc(h.AdminUpdateUser))))
 	s.mux.Handle("DELETE /api/admin/users/{id}", auth(AdminMiddleware(http.HandlerFunc(h.AdminDeleteUser))))
 

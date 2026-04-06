@@ -202,16 +202,17 @@ select.form-control,select.form-input{appearance:none;cursor:pointer;background-
 .breadcrumb-item:hover{color:var(--text)}
 .breadcrumb-sep{color:var(--text-3);font-size:.75rem}
 
-/* ─── Dropzone ─── */
-.dropzone{
-  border:1.5px dashed var(--border);border-radius:var(--r-lg);padding:32px;text-align:center;
-  color:var(--text-3);transition:all var(--tr);margin-bottom:20px;
+/* ─── Drop Overlay ─── */
+.files-page{position:relative;min-height:100%}
+.drop-overlay{
+  position:absolute;inset:0;z-index:50;background:rgba(99,102,241,.08);
+  border:2px dashed var(--primary);border-radius:var(--r-lg);
+  display:flex;align-items:center;justify-content:center;
+  backdrop-filter:blur(2px);transition:opacity .15s;
 }
-.dropzone.active{border-color:var(--primary);background:var(--primary-bg);color:var(--primary)}
-.dropzone-content{display:flex;flex-direction:column;align-items:center;gap:6px}
-.dropzone-content svg{width:24px;height:24px;opacity:.5}
-.dropzone-content p{font-size:.82rem}
-.dropzone-link{color:var(--primary);cursor:pointer;font-weight:500}
+.drop-overlay.hidden{display:none}
+.drop-overlay-content{display:flex;flex-direction:column;align-items:center;gap:8px;color:var(--primary);font-weight:600;font-size:.95rem}
+.drop-overlay-content svg{width:36px;height:36px}
 
 /* ─── Upload Progress ─── */
 .upload-progress{
@@ -227,7 +228,7 @@ select.form-control,select.form-input{appearance:none;cursor:pointer;background-
 .upload-error .upload-item-fill{background:var(--danger)}
 
 /* ─── Storage Bar ─── */
-.storage-bar{margin-top:20px;padding:12px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r)}
+.storage-bar{margin:0 12px 8px;padding:10px 12px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r)}
 .storage-info{display:flex;justify-content:space-between;font-size:.75rem;color:var(--text-3);margin-bottom:6px}
 .storage-track{height:3px;background:var(--surface-3);border-radius:2px;overflow:hidden}
 .storage-fill{height:100%;background:var(--primary);border-radius:2px;transition:width .5s}

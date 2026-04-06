@@ -122,3 +122,56 @@ func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, user)
 }
+func (h *Handler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
+	user := authutil.GetUser(r)
+	if user == nil {
+		writeError(w, http.StatusUnauthorized, "ulgama giri\u0148")
+		return
+	}
+	var req struct {
+		DisplayName string `json:"display_name"`
+		OldPassword string `json:"old_password"`
+		NewPassword string `json:"new_password"`
+	}
+	if err := readJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "n\u00e4dogry maglumat")
+		return
+	}
+	name := strings.TrimSpace(req.DisplayName)
+	if name != "" && name != user.DisplayName {
+		if err := h.db.UpdateDisplayName(user.ID, name); err != nil {
+			writeError(w, http.StatusInternalServerError, "ady \u00fc\u00fdtgedip bolmady")
+			return
+		}
+	}
+	if req.NewPassword != "" {
+		if len(req.NewPassword) < 6 {
+			writeError(w, http.StatusBadRequest, "t\u00e4ze parol a\u017cyndan 6 simwol bolmaly")
+			return
+		}
+		full, err := h.db.GetUserByID(user.ID)
+		if err != nil || full == nil {
+			writeError(w, http.StatusInternalServerError, "\u00fda\u0148ly\u015flyk")
+			return
+		}
+		if !authutil.CheckPassword(req.OldPassword, full.PasswordHash) {
+			writeError(w, http.StatusForbidden, "k\u00f6ne parol n\u00e4dogry")
+			return
+		}
+		hash, err := authutil.HashPassword(req.NewPassword)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "\u00fda\u0148ly\u015flyk")
+			return
+		}
+		if err := h.db.UpdatePassword(user.ID, hash); err != nil {
+			writeError(w, http.StatusInternalServerError, "paroly \u00fc\u00fdtgedip bolmady")
+			return
+		}
+	}
+	updated, _ := h.db.GetUserByID(user.ID)
+	if updated != nil {
+		writeJSON(w, http.StatusOK, updated)
+	} else {
+		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	}
+}

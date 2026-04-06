@@ -56,6 +56,7 @@ const App = {
 
         app.innerHTML = this.renderShell(page);
         this.initPage(page);
+        this.loadStorageUsage();
     },
 
     renderShell(page) {
@@ -90,14 +91,15 @@ const App = {
                         ${UI.icons.settings} <span>Admin panel</span>
                     </a>` : ''}
                 </nav>
+                <div id="storage-bar" class="storage-bar"></div>
                 <div class="sidebar-footer">
-                    <div class="sidebar-user">
+                    <div class="sidebar-user" style="cursor:pointer" onclick="App.showProfileModal()">
                         <div class="sidebar-avatar">${(u.full_name || 'U').charAt(0).toUpperCase()}</div>
                         <div class="sidebar-user-info">
                             <div class="sidebar-user-name">${UI.esc(u.full_name)}</div>
                             <div class="sidebar-user-role">${u.role === 'admin' ? 'Admin' : 'Ulanyjy'}</div>
                         </div>
-                        <button class="sidebar-logout" onclick="App.logout()" title="Çykyş">${UI.icons.logout}</button>
+                        <button class="sidebar-logout" onclick="event.stopPropagation();App.logout()" title="Çykyş">${UI.icons.logout}</button>
                     </div>
                 </div>
             </aside>
@@ -139,6 +141,17 @@ const App = {
         UI.toast('Ulgamdan çykdyňyz', 'info');
     },
 
+    async loadStorageUsage() {
+        try {
+            const d = await API.files.storageUsage();
+            const bar = document.getElementById('storage-bar');
+            if (!bar) return;
+            const pct = d.quota_bytes > 0 ? Math.min((d.used_bytes / d.quota_bytes) * 100, 100) : 0;
+            bar.innerHTML = `<div class="storage-info"><span>${UI.formatBytes(d.used_bytes)} / ${UI.formatBytes(d.quota_bytes)}</span><span>${Math.round(pct)}%</span></div>
+                <div class="storage-track"><div class="storage-fill ${pct > 90 ? 'danger' : pct > 70 ? 'warning' : ''}" style="width:${pct}%"></div></div>`;
+        } catch {}
+    },
+
     initTheme() {
         const saved = localStorage.getItem('paylash-theme');
         if (saved === 'light') document.documentElement.classList.add('light');
@@ -147,6 +160,31 @@ const App = {
     toggleTheme() {
         const isLight = document.documentElement.classList.toggle('light');
         localStorage.setItem('paylash-theme', isLight ? 'light' : 'dark');
+    },
+
+    showProfileModal() {
+        const u = this.user;
+        UI.showModal('Profil', `
+            <div class="form-group"><label>Doly ady</label><input type="text" id="prof-name" value="${UI.esc(u.full_name)}" class="form-control"></div>
+            <hr style="border:none;border-top:1px solid var(--border);margin:12px 0">
+            <div class="form-group"><label>K\u00f6ne parol</label><input type="password" id="prof-old-pw" class="form-control" placeholder="Di\u0148e \u00fc\u00fdtgetmek \u00fc\u00e7in"></div>
+            <div class="form-group"><label>T\u00e4ze parol</label><input type="password" id="prof-new-pw" class="form-control" placeholder="Azyndan 6 simwol"></div>`,
+            `<button class="btn btn-ghost" onclick="UI.closeModal()">\u00ddatyr</button><button class="btn btn-primary" onclick="App.saveProfile()">\u00ddatda sakla</button>`);
+    },
+
+    async saveProfile() {
+        const name = document.getElementById('prof-name').value.trim();
+        const oldPw = document.getElementById('prof-old-pw').value;
+        const newPw = document.getElementById('prof-new-pw').value;
+        if (!name) { UI.toast('Ady giri\u017ai\u0148', 'error'); return; }
+        if (newPw && !oldPw) { UI.toast('K\u00f6ne paroly giri\u017ai\u0148', 'error'); return; }
+        try {
+            const updated = await API.auth.updateProfile(name, oldPw, newPw);
+            this.user = updated;
+            UI.closeModal();
+            UI.toast('Profil \u00fc\u00fdtgedildi', 'success');
+            this.renderPage(this.currentPage);
+        } catch (e) { UI.toast(e.message, 'error'); }
     }
 };
 

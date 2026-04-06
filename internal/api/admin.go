@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	"paylash/internal/authutil"
 	"paylash/internal/models"
 	"paylash/internal/storage"
 	"strconv"
@@ -237,4 +238,65 @@ func (h *Handler) AdminDeleteUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+func (h *Handler) AdminCreateUser(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Username  string `json:"username"`
+		Password  string `json:"password"`
+		FullName  string `json:"full_name"`
+		Role      string `json:"role"`
+		FacultyID int    `json:"faculty_id"`
+		CourseID  int    `json:"course_id"`
+		GroupID   int    `json:"group_id"`
+		QuotaMB   int    `json:"quota_mb"`
+	}
+	if err := readJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "n\u00e4dogry maglumat")
+		return
+	}
+	req.Username = strings.TrimSpace(req.Username)
+	if len(req.Username) < 3 {
+		writeError(w, http.StatusBadRequest, "ulanyjy ady azyndan 3 harp bolmaly")
+		return
+	}
+	if len(req.Password) < 6 {
+		writeError(w, http.StatusBadRequest, "parol azyndan 6 simwol bolmaly")
+		return
+	}
+	exists, err := h.db.UserExists(req.Username)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "\u00fda\u0148ly\u015flyk")
+		return
+	}
+	if exists {
+		writeError(w, http.StatusConflict, "bu ulanyjy ady e\u00fd\u00fd\u00e4m bar")
+		return
+	}
+	hash, err := authutil.HashPassword(req.Password)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "\u00fda\u0148ly\u015flyk")
+		return
+	}
+	regReq := &models.RegisterRequest{
+		Username:  req.Username,
+		Password:  req.Password,
+		FullName:  strings.TrimSpace(req.FullName),
+		FacultyID: req.FacultyID,
+		CourseID:  req.CourseID,
+		GroupID:   req.GroupID,
+	}
+	user, err := h.db.CreateUser(regReq, hash)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "ulanyjy d\u00f6redip bolmady")
+		return
+	}
+	if req.Role == "admin" {
+		h.db.UpdateUser(user.ID, "admin", user.QuotaBytes, user.GroupID)
+	}
+	if req.QuotaMB > 0 {
+		h.db.UpdateUser(user.ID, req.Role, int64(req.QuotaMB)*1024*1024, user.GroupID)
+	}
+	bucket := storage.PersonalBucket(user.ID)
+	h.minio.EnsureBucket(r.Context(), bucket)
+	writeJSON(w, http.StatusCreated, user)
 }

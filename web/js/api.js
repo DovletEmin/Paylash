@@ -29,6 +29,11 @@ const API = {
         },
         logout() { return API._request('POST', '/api/auth/logout'); },
         me() { return API._request('GET', '/api/auth/me'); },
+        updateProfile(displayName, oldPassword, newPassword) {
+            return API._request('PATCH', '/api/auth/profile', {
+                display_name: displayName, old_password: oldPassword, new_password: newPassword
+            });
+        },
     },
 
     catalogs: {
@@ -140,8 +145,11 @@ const API = {
                 if (filters) url += '?' + new URLSearchParams(filters).toString();
                 return API._request('GET', url);
             },
-            update(id, role, quotaBytes) {
-                return API._request('PATCH', `/api/admin/users/${id}`, { role, quota_bytes: quotaBytes });
+            create(data) {
+                return API._request('POST', '/api/admin/users', data);
+            },
+            update(id, data) {
+                return API._request('PATCH', `/api/admin/users/${id}`, data);
             },
             delete(id) { return API._request('DELETE', `/api/admin/users/${id}`); },
         },

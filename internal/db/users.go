@@ -115,6 +115,16 @@ func (d *DB) DeleteUser(id int) error {
 	return err
 }
 
+func (d *DB) UpdateDisplayName(id int, name string) error {
+	_, err := d.Exec(`UPDATE users SET display_name = $1 WHERE id = $2`, name, id)
+	return err
+}
+
+func (d *DB) UpdatePassword(id int, hash string) error {
+	_, err := d.Exec(`UPDATE users SET password_hash = $1 WHERE id = $2`, hash, id)
+	return err
+}
+
 func (d *DB) UserExists(username string) (bool, error) {
 	var exists bool
 	err := d.QueryRow(`SELECT EXISTS(SELECT 1 FROM users WHERE username = $1)`, username).Scan(&exists)
