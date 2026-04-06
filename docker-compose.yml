@@ -54,7 +54,7 @@ services:
     environment:
       - server_name=192.168.55.143
       - extra_params=--o:ssl.enable=false --o:net.proto=IPv4
-      - aliasgroup1=https://192.168.55.143
+      - aliasgroup1=http://paylash-app:8080
     cap_add:
       - MKNOD
     extra_hosts:
@@ -72,7 +72,7 @@ services:
       PAYLASH_MINIO_SECRET_KEY: "paylash_secret"
       PAYLASH_MINIO_USE_SSL: "false"
       PAYLASH_COLLABORA_URL: "https://192.168.55.143"
-      PAYLASH_BASE_URL: "https://192.168.55.143"
+      PAYLASH_BASE_URL: "http://paylash-app:8080"
       PAYLASH_JWT_SECRET: "paylash-production-secret"
     depends_on:
       postgres:
