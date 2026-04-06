@@ -18,13 +18,13 @@ services:
     container_name: paylash-db
     restart: unless-stopped
     environment:
-      POSTGRES_DB: paylash
-      POSTGRES_USER: paylash
-      POSTGRES_PASSWORD: paylash_secret
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U paylash"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -35,8 +35,8 @@ services:
     restart: unless-stopped
     command: server /data --console-address ":9001"
     environment:
-      MINIO_ROOT_USER: paylash
-      MINIO_ROOT_PASSWORD: paylash_secret
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
     ports:
       - "9001:9001"
     volumes:
@@ -52,9 +52,9 @@ services:
     container_name: paylash-collabora
     restart: unless-stopped
     environment:
-      - server_name=192.168.55.143
+      - server_name=${COLLABORA_SERVER_NAME}
       - extra_params=--o:ssl.enable=false --o:ssl.termination=true --o:net.proto=IPv4 --o:default_language.locale.language=tk --o:default_language.locale.country=TM
-      - aliasgroup1=http://paylash-app:8080
+      - aliasgroup1=http://paylash-app:${PAYLASH_PORT}
     cap_add:
       - MKNOD
     extra_hosts:
@@ -65,15 +65,15 @@ services:
     container_name: paylash-app
     restart: unless-stopped
     environment:
-      PAYLASH_PORT: "8080"
-      PAYLASH_DB_URL: "postgres://paylash:paylash_secret@postgres:5432/paylash?sslmode=disable"
-      PAYLASH_MINIO_ENDPOINT: "minio:9000"
-      PAYLASH_MINIO_ACCESS_KEY: "paylash"
-      PAYLASH_MINIO_SECRET_KEY: "paylash_secret"
-      PAYLASH_MINIO_USE_SSL: "false"
-      PAYLASH_COLLABORA_URL: "https://192.168.55.143"
-      PAYLASH_BASE_URL: "http://paylash-app:8080"
-      PAYLASH_JWT_SECRET: "paylash-production-secret"
+      PAYLASH_PORT: "${PAYLASH_PORT}"
+      PAYLASH_DB_URL: "${PAYLASH_DB_URL}"
+      PAYLASH_MINIO_ENDPOINT: "${PAYLASH_MINIO_ENDPOINT}"
+      PAYLASH_MINIO_ACCESS_KEY: "${PAYLASH_MINIO_ACCESS_KEY}"
+      PAYLASH_MINIO_SECRET_KEY: "${PAYLASH_MINIO_SECRET_KEY}"
+      PAYLASH_MINIO_USE_SSL: "${PAYLASH_MINIO_USE_SSL}"
+      PAYLASH_COLLABORA_URL: "${PAYLASH_COLLABORA_URL}"
+      PAYLASH_BASE_URL: "${PAYLASH_BASE_URL}"
+      PAYLASH_JWT_SECRET: "${PAYLASH_JWT_SECRET}"
     depends_on:
       postgres:
         condition: service_healthy
