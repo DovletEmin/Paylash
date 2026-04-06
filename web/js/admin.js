@@ -43,7 +43,8 @@ const AdminPage = {
     /* ── Dashboard ── */
     async renderDashboard(el) {
         try {
-            const d = await API.admin.dashboard();
+            const [d, pq] = await Promise.all([API.admin.dashboard(), API.admin.publicQuota.get()]);
+            const pqMB = Math.round((pq.quota_bytes || 53687091200) / (1024 * 1024));
             el.innerHTML = `
             <h2 style="font-size:1.1rem;font-weight:600;margin-bottom:16px">Statistika</h2>
             <div class="stat-cards">
@@ -53,8 +54,21 @@ const AdminPage = {
                 <div class="stat-card"><div class="stat-card-value">${d.total_courses || 0}</div><div class="stat-card-label">Ugurlar</div></div>
                 <div class="stat-card"><div class="stat-card-value">${d.total_groups || 0}</div><div class="stat-card-label">Toparlar</div></div>
                 <div class="stat-card"><div class="stat-card-value">${UI.formatBytes(d.total_bytes || 0)}</div><div class="stat-card-label">Ulanylýan ýer</div></div>
-            </div>`;
+            </div>
+            <h3 style="font-size:1rem;font-weight:600;margin:24px 0 12px">Umumy ammar kwotasy</h3>
+            <div style="display:flex;align-items:center;gap:10px">
+                <input type="number" id="public-quota-mb" class="form-control" value="${pqMB}" min="1" style="width:160px">
+                <span class="text-muted" style="font-size:.82rem">MB</span>
+                <button class="btn btn-primary btn-sm" onclick="AdminPage.savePublicQuota()">Ýatda sakla</button>
+            </div>
+            <p class="text-muted" style="font-size:.78rem;margin-top:6px">Umumy (public) faýllar üçin umumy kwota.</p>`;
         } catch (e) { el.innerHTML = `<p class="text-muted">${UI.esc(e.message)}</p>`; }
+    },
+
+    async savePublicQuota() {
+        const mb = parseInt(document.getElementById('public-quota-mb').value) || 0;
+        if (mb <= 0) { UI.toast('Dogry kwota giriziň', 'error'); return; }
+        try { await API.admin.publicQuota.set(mb); UI.toast('Umumy kwota üýtgedildi', 'success'); } catch (e) { UI.toast(e.message, 'error'); }
     },
 
     /* ── Faculties ── */

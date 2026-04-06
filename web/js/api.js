@@ -123,6 +123,10 @@ const API = {
 
     admin: {
         dashboard() { return API._request('GET', '/api/admin/dashboard'); },
+        publicQuota: {
+            get() { return API._request('GET', '/api/admin/public-quota'); },
+            set(quotaMB) { return API._request('PATCH', '/api/admin/public-quota', { quota_mb: quotaMB }); },
+        },
         faculties: {
             list() { return API._request('GET', '/api/faculties'); },
             create(name) { return API._request('POST', '/api/admin/faculties', { name }); },

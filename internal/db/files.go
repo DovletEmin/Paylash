@@ -160,6 +160,19 @@ func (d *DB) GetStorageUsage(ownerID int, scope string, groupID *int) (*models.S
 		err = d.QueryRow(`SELECT quota_bytes FROM groups WHERE id = $1`, *groupID).Scan(&su.QuotaBytes)
 		return su, err
 	}
+	// public scope
+	err := d.QueryRow(`SELECT COALESCE(SUM(size_bytes), 0) FROM files WHERE visibility = 'public'`).Scan(&su.UsedBytes)
+	if err != nil {
+		return nil, err
+	}
+	var qStr string
+	err = d.QueryRow(`SELECT value FROM settings WHERE key = 'public_quota_bytes'`).Scan(&qStr)
+	if err == nil {
+		su.QuotaBytes, _ = strconv.ParseInt(qStr, 10, 64)
+	}
+	if su.QuotaBytes <= 0 {
+		su.QuotaBytes = 50 * 1024 * 1024 * 1024 // 50 GB default
+	}
 	return su, nil
 }
 

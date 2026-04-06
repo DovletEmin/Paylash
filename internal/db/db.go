@@ -119,6 +119,11 @@ func (d *DB) Migrate() error {
 		`CREATE INDEX IF NOT EXISTS idx_wopi_tokens_token ON wopi_tokens(token)`,
 		`ALTER TABLE files ADD COLUMN IF NOT EXISTS visibility VARCHAR(20) NOT NULL DEFAULT 'private'`,
 		`ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url VARCHAR(500) DEFAULT ''`,
+		`CREATE TABLE IF NOT EXISTS settings (
+			key   VARCHAR(100) PRIMARY KEY,
+			value TEXT NOT NULL DEFAULT ''
+		)`,
+		`INSERT INTO settings (key, value) VALUES ('public_quota_bytes', '53687091200') ON CONFLICT DO NOTHING`,
 	}
 
 	for _, m := range migrations {
@@ -128,4 +133,15 @@ func (d *DB) Migrate() error {
 	}
 	log.Println("database migrations completed")
 	return nil
+}
+
+func (d *DB) GetSetting(key string) (string, error) {
+	var val string
+	err := d.QueryRow(`SELECT value FROM settings WHERE key = $1`, key).Scan(&val)
+	return val, err
+}
+
+func (d *DB) SetSetting(key, value string) error {
+	_, err := d.Exec(`INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = $2`, key, value)
+	return err
 }

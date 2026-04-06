@@ -461,3 +461,31 @@ func (h *Handler) AdminImportUsers(w http.ResponseWriter, r *http.Request) {
 		"results": results,
 	})
 }
+
+func (h *Handler) AdminGetPublicQuota(w http.ResponseWriter, r *http.Request) {
+	val, err := h.db.GetSetting("public_quota_bytes")
+	if err != nil {
+		val = "53687091200"
+	}
+	bytes, _ := strconv.ParseInt(val, 10, 64)
+	if bytes <= 0 {
+		bytes = 53687091200
+	}
+	writeJSON(w, http.StatusOK, map[string]int64{"quota_bytes": bytes})
+}
+
+func (h *Handler) AdminSetPublicQuota(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		QuotaMB int64 `json:"quota_mb"`
+	}
+	if err := readJSON(r, &req); err != nil || req.QuotaMB <= 0 {
+		writeError(w, http.StatusBadRequest, "kwota girizilmeli")
+		return
+	}
+	bytes := req.QuotaMB * 1024 * 1024
+	if err := h.db.SetSetting("public_quota_bytes", strconv.FormatInt(bytes, 10)); err != nil {
+		writeError(w, http.StatusInternalServerError, "üýtgedip bolmady")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
