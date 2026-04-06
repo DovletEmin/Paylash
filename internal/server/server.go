@@ -1,0 +1,122 @@
+package server
+
+import (
+	"embed"
+	"fmt"
+	"io/fs"
+	"log"
+	"net/http"
+	"paylash/internal/api"
+	"paylash/internal/config"
+	"paylash/internal/db"
+	"paylash/internal/storage"
+	"paylash/internal/wopi"
+)
+
+type Server struct {
+	cfg   *config.Config
+	db    *db.DB
+	minio *storage.MinioClient
+	mux   *http.ServeMux
+}
+
+func New(cfg *config.Config, database *db.DB, minioClient *storage.MinioClient, webFS embed.FS) *Server {
+	s := &Server{
+		cfg:   cfg,
+		db:    database,
+		minio: minioClient,
+		mux:   http.NewServeMux(),
+	}
+	s.routes(webFS)
+	return s
+}
+
+func (s *Server) routes(webFS embed.FS) {
+	auth := AuthMiddleware(s.db)
+	h := api.NewHandler(s.db, s.minio, s.cfg)
+	wopiH := wopi.NewHandler(s.db, s.minio, s.cfg)
+
+	// Public routes
+	s.mux.HandleFunc("POST /api/auth/register", h.Register)
+	s.mux.HandleFunc("POST /api/auth/login", h.Login)
+	s.mux.HandleFunc("POST /api/auth/logout", h.Logout)
+
+	// Public catalogs for registration form
+	s.mux.HandleFunc("GET /api/faculties", h.ListFaculties)
+	s.mux.HandleFunc("GET /api/faculties/{id}/courses", h.ListCoursesByFaculty)
+	s.mux.HandleFunc("GET /api/courses/{id}/groups", h.ListGroupsByCourse)
+
+	// Authenticated routes
+	s.mux.Handle("GET /api/auth/me", auth(http.HandlerFunc(h.Me)))
+
+	// Files
+	s.mux.Handle("GET /api/files", auth(http.HandlerFunc(h.ListFiles)))
+	s.mux.Handle("POST /api/files/upload", auth(http.HandlerFunc(h.UploadFile)))
+	s.mux.Handle("GET /api/files/{id}/download", auth(http.HandlerFunc(h.DownloadFile)))
+	s.mux.Handle("PATCH /api/files/{id}", auth(http.HandlerFunc(h.RenameFile)))
+	s.mux.Handle("DELETE /api/files/{id}", auth(http.HandlerFunc(h.DeleteFile)))
+	s.mux.Handle("GET /api/search", auth(http.HandlerFunc(h.SearchFiles)))
+	s.mux.Handle("GET /api/storage/usage", auth(http.HandlerFunc(h.StorageUsage)))
+
+	// Folders
+	s.mux.Handle("POST /api/folders", auth(http.HandlerFunc(h.CreateFolder)))
+	s.mux.Handle("PATCH /api/folders/{id}", auth(http.HandlerFunc(h.RenameFolder)))
+	s.mux.Handle("DELETE /api/folders/{id}", auth(http.HandlerFunc(h.DeleteFolder)))
+
+	// Sharing
+	s.mux.Handle("POST /api/files/{id}/share", auth(http.HandlerFunc(h.ShareFile)))
+	s.mux.Handle("DELETE /api/files/{id}/share/{userId}", auth(http.HandlerFunc(h.DeleteShare)))
+	s.mux.Handle("PATCH /api/files/{id}/share/public", auth(http.HandlerFunc(h.SetPublicShare)))
+	s.mux.Handle("GET /api/shared-with-me", auth(http.HandlerFunc(h.SharedWithMe)))
+	s.mux.Handle("GET /api/files/{id}/shares", auth(http.HandlerFunc(h.GetSharesForFile)))
+	s.mux.Handle("GET /api/users/search", auth(http.HandlerFunc(h.SearchUsers)))
+
+	// Collabora
+	s.mux.Handle("GET /api/collabora/editor-url", auth(http.HandlerFunc(h.CollaboraEditorURL)))
+
+	// Admin routes
+	s.mux.Handle("GET /api/admin/dashboard", auth(AdminMiddleware(http.HandlerFunc(h.AdminDashboard))))
+	s.mux.Handle("POST /api/admin/faculties", auth(AdminMiddleware(http.HandlerFunc(h.AdminCreateFaculty))))
+	s.mux.Handle("PATCH /api/admin/faculties/{id}", auth(AdminMiddleware(http.HandlerFunc(h.AdminUpdateFaculty))))
+	s.mux.Handle("DELETE /api/admin/faculties/{id}", auth(AdminMiddleware(http.HandlerFunc(h.AdminDeleteFaculty))))
+	s.mux.Handle("POST /api/admin/courses", auth(AdminMiddleware(http.HandlerFunc(h.AdminCreateCourse))))
+	s.mux.Handle("PATCH /api/admin/courses/{id}", auth(AdminMiddleware(http.HandlerFunc(h.AdminUpdateCourse))))
+	s.mux.Handle("DELETE /api/admin/courses/{id}", auth(AdminMiddleware(http.HandlerFunc(h.AdminDeleteCourse))))
+	s.mux.Handle("POST /api/admin/groups", auth(AdminMiddleware(http.HandlerFunc(h.AdminCreateGroup))))
+	s.mux.Handle("PATCH /api/admin/groups/{id}", auth(AdminMiddleware(http.HandlerFunc(h.AdminUpdateGroup))))
+	s.mux.Handle("DELETE /api/admin/groups/{id}", auth(AdminMiddleware(http.HandlerFunc(h.AdminDeleteGroup))))
+	s.mux.Handle("GET /api/admin/users", auth(AdminMiddleware(http.HandlerFunc(h.AdminListUsers))))
+	s.mux.Handle("PATCH /api/admin/users/{id}", auth(AdminMiddleware(http.HandlerFunc(h.AdminUpdateUser))))
+	s.mux.Handle("DELETE /api/admin/users/{id}", auth(AdminMiddleware(http.HandlerFunc(h.AdminDeleteUser))))
+
+	// WOPI endpoints (accessed by Collabora, token-based auth)
+	s.mux.HandleFunc("GET /wopi/files/{id}", wopiH.CheckFileInfo)
+	s.mux.HandleFunc("GET /wopi/files/{id}/contents", wopiH.GetFile)
+	s.mux.HandleFunc("POST /wopi/files/{id}/contents", wopiH.PutFile)
+
+	// Static frontend
+	webSub, err := fs.Sub(webFS, "web")
+	if err != nil {
+		log.Fatal("cannot load embedded web files:", err)
+	}
+	fileServer := http.FileServer(http.FS(webSub))
+	s.mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		// SPA: serve index.html for non-file paths
+		if r.URL.Path != "/" {
+			// Check if file exists
+			f, err := webSub.(fs.ReadFileFS).ReadFile(r.URL.Path[1:])
+			if err != nil || f == nil {
+				// Serve index.html for SPA routing
+				r.URL.Path = "/"
+			}
+		}
+		fileServer.ServeHTTP(w, r)
+	})
+}
+
+func (s *Server) Start() error {
+	addr := fmt.Sprintf(":%d", s.cfg.Port)
+	handler := LoggingMiddleware(CORSMiddleware(s.mux))
+	log.Printf("Paylash server starting on http://localhost%s", addr)
+	return http.ListenAndServe(addr, handler)
+}
