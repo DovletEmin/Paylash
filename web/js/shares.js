@@ -1,39 +1,59 @@
 /* Paylash — Shares Page */
 const SharesPage = {
+    _activeShareTab: 'with-me',
+
     renderSharedWithMe() {
         return `
-        <div>
-            <h3 style="font-size:1rem;font-weight:600;margin-bottom:12px">📤 Meniň paýlaşanlarym</h3>
-            <div id="shared-by-me-content">${UI.skeletonCards(3)}</div>
-            <h3 style="font-size:1rem;font-weight:600;margin:24px 0 12px">📥 Maňa paýlaşylanlar</h3>
-            <div id="shared-content">${UI.skeletonCards(3)}</div>
-        </div>`;
+        <div class="shares-tabs">
+            <button class="shares-tab active" id="tab-with-me" onclick="SharesPage.switchShareTab('with-me')">📥 Men bilen paýlaşylanlar</button>
+            <button class="shares-tab" id="tab-by-me" onclick="SharesPage.switchShareTab('by-me')">📤 Meniň paýlaşanlarym</button>
+        </div>
+        <div id="shares-tab-content">${UI.skeletonCards(3)}</div>`;
     },
 
     async initSharedWithMe() {
-        this.loadSharedByMe();
+        this._activeShareTab = 'with-me';
         this.loadSharedWithMe();
     },
 
+    switchShareTab(tab) {
+        this._activeShareTab = tab;
+        document.querySelectorAll('.shares-tab').forEach(b => b.classList.toggle('active', b.id === `tab-${tab}`));
+        const c = document.getElementById('shares-tab-content');
+        if (c) c.innerHTML = UI.skeletonCards(3);
+        if (tab === 'with-me') this.loadSharedWithMe();
+        else this.loadSharedByMe();
+    },
+
     async loadSharedByMe() {
-        const c = document.getElementById('shared-by-me-content');
+        const c = document.getElementById('shares-tab-content');
         if (!c) return;
         try {
-            const files = (await API.sharing.sharedByMe()) || [];
-            if (!files.length) {
-                c.innerHTML = '<p class="text-muted" style="font-size:.85rem">Heniz hiç kime faýl paýlaşmadyňyz</p>';
+            const shares = (await API.sharing.sharedByMe()) || [];
+            if (!shares.length) {
+                c.innerHTML = '<div class="shares-empty"><div class="shares-empty-icon">📤</div><p>Heniz hiç kime faýl paýlaşmadyňyz</p></div>';
                 return;
             }
+            // Group by file id
+            const grouped = {};
+            for (const s of shares) {
+                if (!grouped[s.id]) grouped[s.id] = { file: s, recipients: [] };
+                grouped[s.id].recipients.push({ name: s.shared_with_name, permission: s.permission });
+            }
             let h = '<div class="file-grid">';
-            for (const f of files) {
+            for (const g of Object.values(grouped)) {
+                const f = g.file;
                 const icon = UI.fileIcon(f.name, false);
                 const dbl = UI.isMediaPreviewable(f.name) ? `PreviewPage.open(${f.id},'${UI.esc(f.name)}')`
                     : UI.isCollaboraViewable(f.name) ? `EditorPage.open(${f.id},'${UI.esc(f.name)}')` : `FilesPage.download(${f.id},'${UI.esc(f.name)}')`;
+                const names = g.recipients.map(r => r.name).filter(Boolean);
+                const countText = names.length === 1 ? names[0] : names.length + ' ulanyjy';
                 h += `<div class="file-card" ondblclick="${dbl}">
                     <div class="file-card-icon document">${icon}</div>
                     <div class="file-card-name" title="${UI.esc(f.name)}">${UI.esc(f.name)}</div>
-                    <div class="file-card-meta">${UI.formatBytes(f.size_bytes || 0)}${f.shared_with_name ? ' → ' + UI.esc(f.shared_with_name) : ''}</div>
-                    <div class="file-card-badge">${f.permission === 'edit' ? '✏️ Redaktirläp bolýar' : '👁 Diňe görmek'}</div>
+                    <div class="file-card-meta">${UI.formatBytes(f.size_bytes || 0)}</div>
+                    <div class="file-card-badge">→ ${UI.esc(countText)}</div>
+                    ${names.length > 1 ? `<div class="file-card-recipients" title="${UI.esc(names.join(', '))}">${names.map(n => UI.esc(n)).join(', ')}</div>` : ''}
                 </div>`;
             }
             c.innerHTML = h + '</div>';
@@ -43,12 +63,12 @@ const SharesPage = {
     },
 
     async loadSharedWithMe() {
-        const c = document.getElementById('shared-content');
+        const c = document.getElementById('shares-tab-content');
         if (!c) return;
         try {
             const files = (await API.sharing.sharedWithMe()) || [];
             if (!files.length) {
-                c.innerHTML = '<p class="text-muted" style="font-size:.85rem">Heniz hiç kim size faýl paýlaşmadyk</p>';
+                c.innerHTML = '<div class="shares-empty"><div class="shares-empty-icon">📥</div><p>Heniz hiç kim size faýl paýlaşmadyk</p></div>';
                 return;
             }
             let h = '<div class="file-grid">';
@@ -68,6 +88,13 @@ const SharesPage = {
             c.innerHTML = `<p class="text-muted">${UI.esc(err.message)}</p>`;
         }
     },
+
+    /* ── Share Modal (multi-user) ── */
+
+    _currentFile: null,
+    _pendingRecipients: [],
+    _existingShareUserIds: [],
+    _selectedVisibility: 'private',
 
     showShareModal(file) {
         const isAdmin = App.user && App.user.role === 'admin';
@@ -93,7 +120,6 @@ const SharesPage = {
                 <label>Ulanyjy gözle</label>
                 <input type="text" id="share-user-search" class="form-control" placeholder="Ulanyjy adyny ýazyň…" oninput="SharesPage.searchUsers(this.value)">
                 <div id="share-user-results" class="share-user-results"></div>
-                <div id="share-selected-user" class="share-selected-user hidden"></div>
             </div>
             <div class="form-group">
                 <label>Rugsat</label>
@@ -102,17 +128,16 @@ const SharesPage = {
                     <option value="edit">✏️ Redaktirlemek</option>
                 </select>
             </div>
+            <div id="share-pending-list"></div>
             ${visibilityHTML}
             <div id="share-existing"><p class="text-muted">Ýüklenýär…</p></div>`,
             `<button class="btn btn-ghost" onclick="UI.closeModal()">Ýatyr</button><button class="btn btn-primary" onclick="SharesPage.saveShare()">Ýatda sakla</button>`);
         this._currentFile = file;
-        this._selectedUserId = null;
+        this._pendingRecipients = [];
+        this._existingShareUserIds = [];
         this._selectedVisibility = vis;
         this.loadExistingShares(file.id);
     },
-
-    _currentFile: null,
-    _selectedUserId: null,
 
     async searchUsers(q) {
         const r = document.getElementById('share-user-results');
@@ -121,33 +146,56 @@ const SharesPage = {
         try {
             const users = await API.sharing.searchUsers(q);
             if (!users?.length) { r.innerHTML = '<div class="share-user-no-result">Tapylmady</div>'; return; }
-            r.innerHTML = users.map(u => `
-                <div class="share-user-item" onclick="SharesPage.selectUser(${u.id},'${UI.esc(u.full_name)}')">
+            // Filter out already-pending and already-shared users
+            const skipIds = new Set([
+                ...this._pendingRecipients.map(p => p.id),
+                ...this._existingShareUserIds,
+                App.user?.id
+            ].filter(Boolean));
+            const filtered = users.filter(u => !skipIds.has(u.id));
+            if (!filtered.length) { r.innerHTML = '<div class="share-user-no-result">Tapylmady</div>'; return; }
+            r.innerHTML = filtered.map(u => `
+                <div class="share-user-item" onclick="SharesPage.addRecipient(${u.id},'${UI.esc(u.full_name)}','${UI.esc(u.username)}')">
                     <span class="share-user-avatar">${(u.full_name||'?').charAt(0).toUpperCase()}</span>
                     <div><div class="share-user-name">${UI.esc(u.full_name)}</div><div class="share-user-username">@${UI.esc(u.username)}</div></div>
                 </div>`).join('');
         } catch { r.innerHTML = ''; }
     },
 
-    selectUser(id, name) {
-        this._selectedUserId = id;
+    addRecipient(id, name, username) {
+        if (this._pendingRecipients.some(p => p.id === id)) return;
+        const perm = document.getElementById('share-permission')?.value || 'view';
+        this._pendingRecipients.push({ id, name, username, permission: perm });
         document.getElementById('share-user-search').value = '';
         document.getElementById('share-user-results').innerHTML = '';
-        const sel = document.getElementById('share-selected-user');
-        if (sel) {
-            sel.classList.remove('hidden');
-            sel.innerHTML = `<div class="share-user-item">
-                <span class="share-user-avatar">${(name||'?').charAt(0).toUpperCase()}</span>
-                <div><div class="share-user-name">${UI.esc(name)}</div></div>
-                <button class="btn btn-icon btn-sm" onclick="SharesPage.clearSelectedUser()" title="Aýyr">✕</button>
-            </div>`;
-        }
+        this.renderPendingList();
     },
 
-    clearSelectedUser() {
-        this._selectedUserId = null;
-        const sel = document.getElementById('share-selected-user');
-        if (sel) { sel.classList.add('hidden'); sel.innerHTML = ''; }
+    removeRecipient(id) {
+        this._pendingRecipients = this._pendingRecipients.filter(p => p.id !== id);
+        this.renderPendingList();
+    },
+
+    updateRecipientPermission(id, perm) {
+        const r = this._pendingRecipients.find(p => p.id === id);
+        if (r) r.permission = perm;
+    },
+
+    renderPendingList() {
+        const el = document.getElementById('share-pending-list');
+        if (!el) return;
+        if (!this._pendingRecipients.length) { el.innerHTML = ''; return; }
+        el.innerHTML = '<h4 style="font-size:.82rem;font-weight:600;color:var(--text-2);margin:8px 0">Täze paýlaşmalar</h4>' +
+            this._pendingRecipients.map(p => `
+            <div class="share-pending-item">
+                <span class="share-user-avatar">${(p.name||'?').charAt(0).toUpperCase()}</span>
+                <div style="flex:1;min-width:0"><div style="font-size:.82rem;font-weight:500">${UI.esc(p.name)}</div></div>
+                <select class="form-control" style="width:auto;padding:4px 28px 4px 8px;font-size:.72rem" onchange="SharesPage.updateRecipientPermission(${p.id},this.value)">
+                    <option value="view" ${p.permission === 'view' ? 'selected' : ''}>👁 Görmek</option>
+                    <option value="edit" ${p.permission === 'edit' ? 'selected' : ''}>✏️ Redaktirlemek</option>
+                </select>
+                <button class="btn btn-icon btn-sm btn-danger" onclick="SharesPage.removeRecipient(${p.id})" title="Aýyr">✕</button>
+            </div>`).join('');
     },
 
     selectVisibility(vis) {
@@ -167,25 +215,23 @@ const SharesPage = {
                 await API.sharing.setVisibility(this._currentFile.id, newVis);
                 this._currentFile.visibility = newVis;
             }
-            // Share with selected user
-            if (this._selectedUserId) {
-                const perm = document.getElementById('share-permission').value;
-                await API.sharing.share(this._currentFile.id, this._selectedUserId, perm);
-                this._selectedUserId = null;
+            // Share with all pending recipients
+            const errors = [];
+            for (const p of this._pendingRecipients) {
+                try {
+                    await API.sharing.share(this._currentFile.id, p.id, p.permission);
+                } catch (e) { errors.push(`${p.name}: ${e.message}`); }
             }
             UI.closeModal();
-            UI.toast('Üýtgeşmeler ýatda saklandy', 'success');
+            if (errors.length) {
+                UI.toast(`Käbir ýalňyşlyklar: ${errors.join('; ')}`, 'error');
+            } else if (this._pendingRecipients.length) {
+                UI.toast(`${this._pendingRecipients.length} ulanyjy bilen paýlaşyldy`, 'success');
+            } else {
+                UI.toast('Üýtgeşmeler ýatda saklandy', 'success');
+            }
+            this._pendingRecipients = [];
             if (typeof FilesPage !== 'undefined') FilesPage.loadFiles();
-        } catch (e) { UI.toast(e.message, 'error'); }
-    },
-
-    async setVisibility(fileId, visibility) {
-        try {
-            await API.sharing.setVisibility(fileId, visibility);
-            document.querySelectorAll('.vis-btn').forEach(b => b.classList.toggle('active', b.dataset.vis === visibility));
-            const st = document.getElementById('vis-status');
-            if (st) st.textContent = visibility === 'public' ? 'Ähli ulanyjylar görüp biler' : visibility === 'group' ? 'Topardaşlaryňyz görüp biler' : 'Diňe siz we paýlaşylanlar';
-            if (this._currentFile) this._currentFile.visibility = visibility;
         } catch (e) { UI.toast(e.message, 'error'); }
     },
 
@@ -194,6 +240,7 @@ const SharesPage = {
         if (!el) return;
         try {
             const shares = await API.sharing.getFileShares(fileId);
+            this._existingShareUserIds = (shares || []).filter(s => s.shared_with).map(s => s.shared_with);
             if (!shares?.length) { el.innerHTML = '<p class="text-muted" style="font-size:.82rem">Heniz hiç kim bilen paýlaşylmadyk</p>'; return; }
             el.innerHTML = '<h4 style="font-size:.82rem;font-weight:600;color:var(--text-2);margin-bottom:8px">Paýlaşylanlar</h4>' +
                 shares.map(s => `

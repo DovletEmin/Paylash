@@ -119,7 +119,7 @@ func (d *DB) GetSharedWithMe(userID int, groupID *int) ([]models.SharedFileView,
 }
 
 func (d *DB) GetSharedByMe(userID int) ([]models.SharedByMeView, error) {
-	q := `SELECT DISTINCT ON (f.id)
+	q := `SELECT
 			f.id, f.name, f.mime_type, f.size_bytes, f.minio_bucket, f.minio_key,
 			f.folder_id, f.owner_id, f.group_id, f.scope, f.visibility, f.version, f.created_at, f.updated_at,
 			COALESCE(u.display_name, u.username, '') AS shared_with_name,
@@ -129,7 +129,7 @@ func (d *DB) GetSharedByMe(userID int) ([]models.SharedByMeView, error) {
 		JOIN files f ON f.id = fs.file_id
 		LEFT JOIN users u ON u.id = fs.shared_with
 		WHERE fs.shared_by = $1 AND fs.shared_with IS NOT NULL
-		ORDER BY f.id, fs.created_at DESC`
+		ORDER BY fs.created_at DESC`
 
 	rows, err := d.Query(q, userID)
 	if err != nil {
