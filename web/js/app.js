@@ -67,6 +67,15 @@ const App = {
                     <a class="nav-item ${page === 'files' ? 'active' : ''}" onclick="App.navigate('files')">
                         ${UI.icons.folder} <span>Faýllar</span>
                     </a>
+                    <a class="nav-item nav-sub ${page === 'files' && FilesPage.currentScope === 'personal' ? 'active' : ''}" onclick="FilesPage.setScope('personal');App.navigate('files')">
+                        <span>🔒</span> <span>Şahsy</span>
+                    </a>
+                    <a class="nav-item nav-sub ${page === 'files' && FilesPage.currentScope === 'group' ? 'active' : ''}" onclick="FilesPage.setScope('group');App.navigate('files')">
+                        <span>👥</span> <span>Topar</span>
+                    </a>
+                    <a class="nav-item nav-sub ${page === 'files' && FilesPage.currentScope === 'public' ? 'active' : ''}" onclick="FilesPage.setScope('public');App.navigate('files')">
+                        <span>🌐</span> <span>Umumy</span>
+                    </a>
                     <a class="nav-item ${page === 'shared' ? 'active' : ''}" onclick="App.navigate('shared')">
                         ${UI.icons.share} <span>Paýlaşylanlar</span>
                     </a>

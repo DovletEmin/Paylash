@@ -60,6 +60,8 @@ input,select,textarea{font-family:var(--font);outline:none}
 .nav-item.active{background:var(--primary-bg);color:var(--primary)}
 .nav-item svg{width:18px;height:18px;flex-shrink:0;opacity:.7}
 .nav-item.active svg{opacity:1}
+.nav-sub{padding-left:40px;font-size:.8rem}
+.nav-sub span:first-child{font-size:.85rem;width:18px;text-align:center}
 .nav-item.admin-item.active{background:var(--purple-bg);color:var(--purple)}
 .sidebar-footer{border-top:1px solid var(--border);padding:12px}
 .sidebar-user{display:flex;align-items:center;gap:10px;padding:6px 8px;border-radius:var(--r)}
@@ -341,6 +343,9 @@ select.form-control,select.form-input{appearance:none;cursor:pointer;background-
 .share-user-name{font-weight:500;font-size:.82rem}
 .share-user-username{font-size:.72rem;color:var(--text-3)}
 .share-user-no-result{padding:10px;font-size:.82rem;color:var(--text-3);text-align:center}
+.share-selected-user{margin-top:6px;background:var(--surface-2);border-radius:var(--r);padding:2px 4px}
+.share-selected-user .share-user-item{padding:6px 8px}
+.share-selected-user .btn-icon{color:var(--text-3);margin-left:auto}
 .share-existing{margin-top:12px}
 .share-existing h4{font-size:.82rem;font-weight:600;margin-bottom:8px;color:var(--text-2)}
 .share-existing-item{

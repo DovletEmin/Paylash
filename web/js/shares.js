@@ -40,6 +40,7 @@ const SharesPage = {
                 <label>Ulanyjy gözle</label>
                 <input type="text" id="share-user-search" class="form-control" placeholder="Ulanyjy adyny ýazyň…" oninput="SharesPage.searchUsers(this.value)">
                 <div id="share-user-results" class="share-user-results"></div>
+                <div id="share-selected-user" class="share-selected-user hidden"></div>
             </div>
             <div class="form-group">
                 <label>Rugsat</label>
@@ -52,16 +53,19 @@ const SharesPage = {
             <div class="form-group">
                 <label>Görnüşi</label>
                 <div class="visibility-buttons" id="vis-buttons">
-                    <button class="btn btn-sm vis-btn ${vis === 'private' ? 'active' : ''}" data-vis="private" onclick="SharesPage.setVisibility(${file.id},'private')">🔒 Şahsy</button>
-                    <button class="btn btn-sm vis-btn ${vis === 'group' ? 'active' : ''}" data-vis="group" onclick="SharesPage.setVisibility(${file.id},'group')">👥 Topar</button>
-                    <button class="btn btn-sm vis-btn ${vis === 'public' ? 'active' : ''}" data-vis="public" onclick="SharesPage.setVisibility(${file.id},'public')">🌐 Umumy</button>
+                    <button class="btn btn-sm vis-btn ${vis === 'private' ? 'active' : ''}" data-vis="private" onclick="SharesPage.selectVisibility('private')">🔒 Şahsy</button>
+                    <button class="btn btn-sm vis-btn ${vis === 'group' ? 'active' : ''}" data-vis="group" onclick="SharesPage.selectVisibility('group')">👥 Topar</button>
+                    <button class="btn btn-sm vis-btn ${vis === 'public' ? 'active' : ''}" data-vis="public" onclick="SharesPage.selectVisibility('public')">🌐 Umumy</button>
                 </div>
                 <div id="vis-status" class="vis-status" style="font-size:.78rem;color:var(--text-3);margin-top:6px">
                     ${vis === 'public' ? 'Ähli ulanyjylar görüp biler' : vis === 'group' ? 'Topardaşlaryňyz görüp biler' : 'Diňe siz we paýlaşylanlar'}
                 </div>
             </div>
-            <div id="share-existing"><p class="text-muted">Ýüklenýär…</p></div>`, '');
+            <div id="share-existing"><p class="text-muted">Ýüklenýär…</p></div>`,
+            `<button class="btn btn-ghost" onclick="UI.closeModal()">Ýatyr</button><button class="btn btn-primary" onclick="SharesPage.saveShare()">Ýatda sakla</button>`);
         this._currentFile = file;
+        this._selectedUserId = null;
+        this._selectedVisibility = vis;
         this.loadExistingShares(file.id);
     },
 
@@ -85,20 +89,51 @@ const SharesPage = {
 
     selectUser(id, name) {
         this._selectedUserId = id;
-        document.getElementById('share-user-search').value = name;
+        document.getElementById('share-user-search').value = '';
         document.getElementById('share-user-results').innerHTML = '';
-        this.doShare();
+        const sel = document.getElementById('share-selected-user');
+        if (sel) {
+            sel.classList.remove('hidden');
+            sel.innerHTML = `<div class="share-user-item">
+                <span class="share-user-avatar">${(name||'?').charAt(0).toUpperCase()}</span>
+                <div><div class="share-user-name">${UI.esc(name)}</div></div>
+                <button class="btn btn-icon btn-sm" onclick="SharesPage.clearSelectedUser()" title="Aýyr">✕</button>
+            </div>`;
+        }
     },
 
-    async doShare() {
-        if (!this._currentFile || !this._selectedUserId) return;
-        const perm = document.getElementById('share-permission').value;
+    clearSelectedUser() {
+        this._selectedUserId = null;
+        const sel = document.getElementById('share-selected-user');
+        if (sel) { sel.classList.add('hidden'); sel.innerHTML = ''; }
+    },
+
+    selectVisibility(vis) {
+        this._selectedVisibility = vis;
+        document.querySelectorAll('.vis-btn').forEach(b => b.classList.toggle('active', b.dataset.vis === vis));
+        const st = document.getElementById('vis-status');
+        if (st) st.textContent = vis === 'public' ? 'Ähli ulanyjylar görüp biler' : vis === 'group' ? 'Topardaşlaryňyz görüp biler' : 'Diňe siz we paýlaşylanlar';
+    },
+
+    async saveShare() {
+        if (!this._currentFile) return;
         try {
-            await API.sharing.share(this._currentFile.id, this._selectedUserId, perm);
-            UI.toast('Faýl paýlaşyldy', 'success');
-            this._selectedUserId = null;
-            document.getElementById('share-user-search').value = '';
-            this.loadExistingShares(this._currentFile.id);
+            // Save visibility
+            const newVis = this._selectedVisibility || 'private';
+            const oldVis = this._currentFile.visibility || 'private';
+            if (newVis !== oldVis) {
+                await API.sharing.setVisibility(this._currentFile.id, newVis);
+                this._currentFile.visibility = newVis;
+            }
+            // Share with selected user
+            if (this._selectedUserId) {
+                const perm = document.getElementById('share-permission').value;
+                await API.sharing.share(this._currentFile.id, this._selectedUserId, perm);
+                this._selectedUserId = null;
+            }
+            UI.closeModal();
+            UI.toast('Üýtgeşmeler ýatda saklandy', 'success');
+            if (typeof FilesPage !== 'undefined') FilesPage.loadFiles();
         } catch (e) { UI.toast(e.message, 'error'); }
     },
 
@@ -109,7 +144,6 @@ const SharesPage = {
             const st = document.getElementById('vis-status');
             if (st) st.textContent = visibility === 'public' ? 'Ähli ulanyjylar görüp biler' : visibility === 'group' ? 'Topardaşlaryňyz görüp biler' : 'Diňe siz we paýlaşylanlar';
             if (this._currentFile) this._currentFile.visibility = visibility;
-            UI.toast('Görnüşi üýtgedildi', 'success');
         } catch (e) { UI.toast(e.message, 'error'); }
     },
 

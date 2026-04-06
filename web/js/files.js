@@ -12,11 +12,6 @@ const FilesPage = {
         <div class="files-page">
             <div class="files-toolbar">
                 <div class="files-toolbar-left">
-                    <div class="scope-toggle">
-                        <button class="btn btn-sm ${this.currentScope === 'personal' ? 'active' : ''}" onclick="FilesPage.setScope('personal')">Şahsy</button>
-                        <button class="btn btn-sm ${this.currentScope === 'group' ? 'active' : ''}" onclick="FilesPage.setScope('group')">Topar</button>
-                        <button class="btn btn-sm ${this.currentScope === 'public' ? 'active' : ''}" onclick="FilesPage.setScope('public')">Umumy</button>
-                    </div>
                 </div>
                 <div class="files-toolbar-right">
                     <div class="search-box">
@@ -140,7 +135,7 @@ const FilesPage = {
         UI.showContextMenu(e.clientX, e.clientY, items);
     },
 
-    setScope(s) { this.currentScope = s; this.currentFolder = null; this.loadFiles(); },
+    setScope(s) { this.currentScope = s; this.currentFolder = null; App.renderPage('files'); },
     setView(m) { this.viewMode = m; this.renderFiles(); },
     goToFolder(id) { this.currentFolder = id; this.loadFiles(); },
 
