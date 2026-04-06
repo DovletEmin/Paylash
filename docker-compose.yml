@@ -53,7 +53,7 @@ services:
     restart: unless-stopped
     environment:
       - server_name=192.168.55.143
-      - extra_params=--o:ssl.enable=false --o:ssl.termination=true --o:net.proto=IPv4
+      - extra_params=--o:ssl.enable=false --o:ssl.termination=true --o:net.proto=IPv4 --o:default_language.locale.language=tk --o:default_language.locale.country=TM
       - aliasgroup1=http://paylash-app:8080
     cap_add:
       - MKNOD
