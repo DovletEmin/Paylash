@@ -1,4 +1,18 @@
 services:
+  nginx:
+    image: nginx:alpine
+    container_name: paylash-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - app
+      - collabora
+
   postgres:
     image: postgres:16-alpine
     container_name: paylash-db
@@ -7,8 +21,6 @@ services:
       POSTGRES_DB: paylash
       POSTGRES_USER: paylash
       POSTGRES_PASSWORD: paylash_secret
-    ports:
-      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -26,7 +38,6 @@ services:
       MINIO_ROOT_USER: paylash
       MINIO_ROOT_PASSWORD: paylash_secret
     ports:
-      - "9000:9000"
       - "9001:9001"
     volumes:
       - minio_data:/data
@@ -40,12 +51,10 @@ services:
     image: collabora/code:latest
     container_name: paylash-collabora
     restart: unless-stopped
-    ports:
-      - "9980:9980"
     environment:
       - server_name=192.168.55.143
       - extra_params=--o:ssl.enable=false --o:net.proto=IPv4
-      - aliasgroup1=http://paylash-app:8080
+      - aliasgroup1=https://192.168.55.143
     cap_add:
       - MKNOD
     extra_hosts:
@@ -55,8 +64,6 @@ services:
     build: .
     container_name: paylash-app
     restart: unless-stopped
-    ports:
-      - "8080:8080"
     environment:
       PAYLASH_PORT: "8080"
       PAYLASH_DB_URL: "postgres://paylash:paylash_secret@postgres:5432/paylash?sslmode=disable"
@@ -64,8 +71,8 @@ services:
       PAYLASH_MINIO_ACCESS_KEY: "paylash"
       PAYLASH_MINIO_SECRET_KEY: "paylash_secret"
       PAYLASH_MINIO_USE_SSL: "false"
-      PAYLASH_COLLABORA_URL: "http://192.168.55.143:9980"
-      PAYLASH_BASE_URL: "http://paylash-app:8080"
+      PAYLASH_COLLABORA_URL: "https://192.168.55.143"
+      PAYLASH_BASE_URL: "https://192.168.55.143"
       PAYLASH_JWT_SECRET: "paylash-production-secret"
     depends_on:
       postgres:
