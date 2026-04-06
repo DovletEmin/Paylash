@@ -82,6 +82,48 @@ func (h *Handler) DeleteShare(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
+func (h *Handler) UpdateSharePermission(w http.ResponseWriter, r *http.Request) {
+	user := authutil.GetUser(r)
+	fileID, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "nädogry ID")
+		return
+	}
+	sharedWithID, err := strconv.Atoi(r.PathValue("userId"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "nädogry ulanyjy ID")
+		return
+	}
+
+	f, err := h.db.GetFile(fileID)
+	if err != nil || f == nil {
+		writeError(w, http.StatusNotFound, "faýl tapylmady")
+		return
+	}
+	if f.OwnerID != user.ID && user.Role != "admin" {
+		writeError(w, http.StatusForbidden, "rugsat ýok")
+		return
+	}
+
+	var req struct {
+		Permission string `json:"permission"`
+	}
+	if err := readJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "nädogry maglumat")
+		return
+	}
+	if req.Permission != "view" && req.Permission != "edit" {
+		writeError(w, http.StatusBadRequest, "rugsat 'view' ýa-da 'edit' bolmaly")
+		return
+	}
+
+	if err := h.db.UpdateSharePermission(fileID, sharedWithID, req.Permission); err != nil {
+		writeError(w, http.StatusInternalServerError, "rugsady üýtgedip bolmady")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok", "permission": req.Permission})
+}
+
 func (h *Handler) SetPublicShare(w http.ResponseWriter, r *http.Request) {
 	user := authutil.GetUser(r)
 	fileID, err := strconv.Atoi(r.PathValue("id"))

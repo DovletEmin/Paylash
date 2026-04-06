@@ -48,6 +48,11 @@ const App = {
             EditorPage.init();
             return;
         }
+        if (page === 'preview') {
+            app.innerHTML = PreviewPage.render();
+            PreviewPage.init();
+            return;
+        }
 
         app.innerHTML = this.renderShell(page);
         this.initPage(page);

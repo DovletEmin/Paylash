@@ -65,6 +65,7 @@ func (s *Server) routes(webFS embed.FS) {
 
 	// Sharing
 	s.mux.Handle("POST /api/files/{id}/share", auth(http.HandlerFunc(h.ShareFile)))
+	s.mux.Handle("PATCH /api/files/{id}/share/{userId}", auth(http.HandlerFunc(h.UpdateSharePermission)))
 	s.mux.Handle("DELETE /api/files/{id}/share/{userId}", auth(http.HandlerFunc(h.DeleteShare)))
 	s.mux.Handle("PATCH /api/files/{id}/share/public", auth(http.HandlerFunc(h.SetPublicShare)))
 	s.mux.Handle("PATCH /api/files/{id}/visibility", auth(http.HandlerFunc(h.SetVisibility)))

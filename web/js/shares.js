@@ -19,8 +19,9 @@ const SharesPage = {
             let h = '<div class="file-grid">';
             for (const f of files) {
                 const icon = UI.fileIcon(f.name, false);
-                const dbl = UI.isCollaboraEditable(f.name) ? `EditorPage.open(${f.id},'${UI.esc(f.name)}')` : `FilesPage.download(${f.id},'${UI.esc(f.name)}')`;
-                h += `<div class="file-card" ondblclick="${dbl}">
+                const dbl = UI.isMediaPreviewable(f.name) ? `PreviewPage.open(${f.id},'${UI.esc(f.name)}')`
+                    : UI.isCollaboraViewable(f.name) ? `EditorPage.open(${f.id},'${UI.esc(f.name)}')` : `FilesPage.download(${f.id},'${UI.esc(f.name)}')`;
+                h += `<div class="file-card" ondblclick="${dbl}">`;
                     <div class="file-card-icon document">${icon}</div>
                     <div class="file-card-name" title="${UI.esc(f.name)}">${UI.esc(f.name)}</div>
                     <div class="file-card-meta">${UI.formatBytes(f.size_bytes || 0)}${f.owner_name ? ' · ' + UI.esc(f.owner_name) : ''}</div>
@@ -159,11 +160,21 @@ const SharesPage = {
                     <span class="share-user-avatar">${(s.full_name || '?').charAt(0).toUpperCase()}</span>
                     <div class="share-existing-info">
                         <div style="font-size:.82rem;font-weight:500">${UI.esc(s.full_name || s.username)}</div>
-                        <div class="text-muted" style="font-size:.72rem">${s.permission === 'edit' ? 'Redaktirlemek' : 'Diňe görmek'}</div>
                     </div>
-                    <button class="btn btn-icon btn-sm btn-danger" onclick="SharesPage.removeShare(${fileId},${s.shared_with})" title="Aýyr">✕</button>
+                    <select class=\"form-control\" style=\"width:auto;padding:4px 28px 4px 8px;font-size:.72rem\" onchange=\"SharesPage.updatePermission(${fileId},${s.shared_with},this.value)\">
+                        <option value=\"view\" ${s.permission === 'view' ? 'selected' : ''}>👁 Görmek</option>
+                        <option value=\"edit\" ${s.permission === 'edit' ? 'selected' : ''}>✏️ Redaktirlemek</option>
+                    </select>
+                    <button class=\"btn btn-icon btn-sm btn-danger\" onclick=\"SharesPage.removeShare(${fileId},${s.shared_with})\" title=\"Aýyr\">✕</button>
                 </div>`).join('');
         } catch { el.innerHTML = ''; }
+    },
+
+    async updatePermission(fileId, userId, permission) {
+        try {
+            await API.sharing.updateSharePermission(fileId, userId, permission);
+            UI.toast('Rugsat üýtgedildi', 'success');
+        } catch (e) { UI.toast(e.message, 'error'); }
     },
 
     async removeShare(fileId, userId) {

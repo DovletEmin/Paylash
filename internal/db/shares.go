@@ -38,6 +38,14 @@ func (d *DB) DeleteShare(fileID, sharedWithID int) error {
 	return err
 }
 
+func (d *DB) UpdateSharePermission(fileID, sharedWithID int, permission string) error {
+	_, err := d.Exec(
+		`UPDATE file_shares SET permission = $3 WHERE file_id = $1 AND shared_with = $2`,
+		fileID, sharedWithID, permission,
+	)
+	return err
+}
+
 func (d *DB) GetSharesForFile(fileID int) ([]models.ShareView, error) {
 	rows, err := d.Query(
 		`SELECT fs.id, fs.file_id, fs.shared_by, fs.shared_with, fs.permission, fs.is_public,

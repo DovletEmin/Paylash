@@ -98,6 +98,9 @@ const API = {
         deleteShare(fileId, userId) {
             return API._request('DELETE', `/api/files/${fileId}/share/${userId}`);
         },
+        updateSharePermission(fileId, userId, permission) {
+            return API._request('PATCH', `/api/files/${fileId}/share/${userId}`, { permission });
+        },
         setPublic(fileId, isPublic) {
             return API._request('PATCH', `/api/files/${fileId}/share/public`, { is_public: isPublic });
         },

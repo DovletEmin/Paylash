@@ -98,6 +98,31 @@ const UI = {
         return ['doc','docx','odt','xls','xlsx','ods','ppt','pptx','odp','pdf'].includes(ext);
     },
 
+    isMediaPreviewable(name) {
+        const ext = name.split('.').pop().toLowerCase();
+        return this.isImage(ext) || this.isAudio(ext) || this.isVideo(ext);
+    },
+
+    isImage(ext) {
+        return ['jpg','jpeg','png','gif','webp','svg','bmp','ico','tiff','tif'].includes(ext);
+    },
+
+    isAudio(ext) {
+        return ['mp3','wav','ogg','flac','aac','m4a','wma','opus'].includes(ext);
+    },
+
+    isVideo(ext) {
+        return ['mp4','webm','ogg','mov','avi','mkv','wmv','flv','m4v'].includes(ext);
+    },
+
+    mediaType(name) {
+        const ext = name.split('.').pop().toLowerCase();
+        if (this.isImage(ext)) return 'image';
+        if (this.isAudio(ext)) return 'audio';
+        if (this.isVideo(ext)) return 'video';
+        return null;
+    },
+
     skeletonCards(n) {
         let h = '<div class="file-grid">';
         for (let i = 0; i < n; i++) h += '<div class="file-card"><div class="skeleton" style="width:40px;height:40px;margin-bottom:10px"></div><div class="skeleton" style="width:75%;height:12px;margin-bottom:4px"></div><div class="skeleton" style="width:45%;height:10px"></div></div>';
