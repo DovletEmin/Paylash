@@ -117,6 +117,7 @@ func (d *DB) Migrate() error {
 		`CREATE INDEX IF NOT EXISTS idx_file_shares_with ON file_shares(shared_with)`,
 		`CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_wopi_tokens_token ON wopi_tokens(token)`,
+		`ALTER TABLE files ADD COLUMN IF NOT EXISTS visibility VARCHAR(20) NOT NULL DEFAULT 'private'`,
 	}
 
 	for _, m := range migrations {

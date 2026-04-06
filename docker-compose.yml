@@ -43,7 +43,7 @@ services:
     ports:
       - "9980:9980"
     environment:
-      - server_name=localhost
+      - server_name=192.168.55.143
       - extra_params=--o:ssl.enable=false --o:net.proto=IPv4
       - aliasgroup1=http://paylash-app:8080
     cap_add:
@@ -64,7 +64,8 @@ services:
       PAYLASH_MINIO_ACCESS_KEY: "paylash"
       PAYLASH_MINIO_SECRET_KEY: "paylash_secret"
       PAYLASH_MINIO_USE_SSL: "false"
-      PAYLASH_COLLABORA_URL: "http://collabora:9980"
+      PAYLASH_COLLABORA_URL: "http://192.168.55.143:9980"
+      PAYLASH_BASE_URL: "http://paylash-app:8080"
       PAYLASH_JWT_SECRET: "paylash-production-secret"
     depends_on:
       postgres:

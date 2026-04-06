@@ -13,6 +13,7 @@ type Config struct {
 	MinioSecretKey string
 	MinioUseSSL   bool
 	CollaboraURL  string
+	BaseURL       string
 	JWTSecret     string
 }
 
@@ -25,6 +26,7 @@ func Load() *Config {
 		MinioSecretKey: getEnv("PAYLASH_MINIO_SECRET_KEY", "paylash_secret"),
 		MinioUseSSL:   getEnvBool("PAYLASH_MINIO_USE_SSL", false),
 		CollaboraURL:  getEnv("PAYLASH_COLLABORA_URL", "http://localhost:9980"),
+		BaseURL:       getEnv("PAYLASH_BASE_URL", "http://localhost:8080"),
 		JWTSecret:     getEnv("PAYLASH_JWT_SECRET", "paylash-dev-secret-change-me"),
 	}
 }

@@ -58,6 +58,7 @@ type File struct {
 	OwnerID     int       `json:"owner_id"`
 	GroupID     *int      `json:"group_id"`
 	Scope       string    `json:"scope"`
+	Visibility  string    `json:"visibility"`
 	Version     int       `json:"version"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
@@ -126,6 +127,10 @@ type CreateFolderRequest struct {
 
 type RenameRequest struct {
 	Name string `json:"name"`
+}
+
+type VisibilityRequest struct {
+	Visibility string `json:"visibility"`
 }
 
 type ShareRequest struct {

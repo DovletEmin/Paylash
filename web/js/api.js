@@ -101,6 +101,9 @@ const API = {
         setPublic(fileId, isPublic) {
             return API._request('PATCH', `/api/files/${fileId}/share/public`, { is_public: isPublic });
         },
+        setVisibility(fileId, visibility) {
+            return API._request('PATCH', `/api/files/${fileId}/visibility`, { visibility });
+        },
         sharedWithMe() { return API._request('GET', '/api/shared-with-me'); },
         getFileShares(fileId) { return API._request('GET', `/api/files/${fileId}/shares`); },
         searchUsers(q) { return API._request('GET', `/api/users/search?q=${encodeURIComponent(q)}`); },

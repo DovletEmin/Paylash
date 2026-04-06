@@ -4,6 +4,7 @@ const App = {
     currentPage: null,
 
     async start() {
+        this.initTheme();
         await this.checkAuth();
         window.addEventListener('popstate', () => this.route());
         this.route();
@@ -90,6 +91,12 @@ const App = {
                 <header class="topbar">
                     <button class="sidebar-toggle" onclick="document.getElementById('sidebar').classList.toggle('open')">${UI.icons.menu}</button>
                     <div class="topbar-title">${this.pageTitle(page)}</div>
+                    <div class="topbar-right">
+                        <button class="btn btn-icon btn-ghost" id="theme-toggle" onclick="App.toggleTheme()" title="Tema">
+                            <span class="theme-icon-dark">${UI.icons.sun}</span>
+                            <span class="theme-icon-light">${UI.icons.moon}</span>
+                        </button>
+                    </div>
                 </header>
                 <div class="page-content" id="page-content"></div>
             </main>
@@ -116,6 +123,16 @@ const App = {
         this.user = null;
         this.navigate('login', true);
         UI.toast('Ulgamdan çykdyňyz', 'info');
+    },
+
+    initTheme() {
+        const saved = localStorage.getItem('paylash-theme');
+        if (saved === 'light') document.documentElement.classList.add('light');
+    },
+
+    toggleTheme() {
+        const isLight = document.documentElement.classList.toggle('light');
+        localStorage.setItem('paylash-theme', isLight ? 'light' : 'dark');
     }
 };
 

@@ -180,7 +180,17 @@ const FilesPage = {
         pg.addEventListener('drop', e => { if (e.dataTransfer.files.length) this.handleFileSelect(e.dataTransfer.files); });
     },
 
-    download(id, name) { const a = document.createElement('a'); a.href = `/api/files/${id}/download`; a.download = name; a.click(); },
+    async download(id, name) {
+        try {
+            const res = await fetch(`/api/files/${id}/download`, { credentials: 'same-origin' });
+            if (!res.ok) throw new Error('Ýükläp bolmady');
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a'); a.href = url; a.download = name;
+            document.body.appendChild(a); a.click(); document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        } catch (e) { UI.toast(e.message || 'Ýükläp bolmady', 'error'); }
+    },
 
     renameFile(item) {
         UI.showModal('Adyny üýtget', `<div class="form-group"><label>Täze ady</label><input type="text" id="rename-input" value="${UI.esc(item.name)}" class="form-control"></div>`,

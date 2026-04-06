@@ -64,20 +64,33 @@ func (d *DB) GetSharesForFile(fileID int) ([]models.ShareView, error) {
 }
 
 func (d *DB) GetSharedWithMe(userID int, groupID *int) ([]models.SharedFileView, error) {
-	q := `SELECT f.id, f.name, f.mime_type, f.size_bytes, f.minio_bucket, f.minio_key,
-	             f.folder_id, f.owner_id, f.group_id, f.scope, f.version, f.created_at, f.updated_at,
-	             u.display_name, fs.permission, fs.created_at
-	      FROM file_shares fs
-	      JOIN files f ON fs.file_id = f.id
-	      JOIN users u ON fs.shared_by = u.id
-	      WHERE (fs.shared_with = $1`
-
 	args := []any{userID}
+
+	q := `SELECT sub.* FROM (
+		SELECT DISTINCT ON (f.id)
+			f.id, f.name, f.mime_type, f.size_bytes, f.minio_bucket, f.minio_key,
+			f.folder_id, f.owner_id, f.group_id, f.scope, f.visibility, f.version, f.created_at, f.updated_at,
+			owner.display_name,
+			COALESCE(fs.permission, 'view') AS perm,
+			COALESCE(fs.created_at, f.updated_at) AS shared_at
+		FROM files f
+		JOIN users owner ON f.owner_id = owner.id
+		LEFT JOIN file_shares fs ON fs.file_id = f.id AND fs.shared_with = $1
+		WHERE f.owner_id != $1
+		AND (
+			fs.id IS NOT NULL
+			OR f.visibility = 'public'`
+
 	if groupID != nil {
-		q += ` OR (fs.is_public = TRUE AND f.group_id = $2)`
+		q += `
+			OR (f.visibility = 'group' AND owner.group_id = $2)`
 		args = append(args, *groupID)
 	}
-	q += `) ORDER BY fs.created_at DESC`
+
+	q += `
+		)
+		ORDER BY f.id, fs.permission DESC NULLS LAST
+	) sub ORDER BY sub.shared_at DESC`
 
 	rows, err := d.Query(q, args...)
 	if err != nil {
@@ -88,7 +101,7 @@ func (d *DB) GetSharedWithMe(userID int, groupID *int) ([]models.SharedFileView,
 	for rows.Next() {
 		var sv models.SharedFileView
 		if err := rows.Scan(&sv.ID, &sv.Name, &sv.MimeType, &sv.SizeBytes, &sv.MinioBucket, &sv.MinioKey,
-			&sv.FolderID, &sv.OwnerID, &sv.GroupID, &sv.Scope, &sv.Version, &sv.CreatedAt, &sv.UpdatedAt,
+			&sv.FolderID, &sv.OwnerID, &sv.GroupID, &sv.Scope, &sv.Visibility, &sv.Version, &sv.CreatedAt, &sv.UpdatedAt,
 			&sv.SharedByName, &sv.Permission, &sv.SharedAt); err != nil {
 			return nil, err
 		}
@@ -111,12 +124,25 @@ func (d *DB) CanAccessFile(fileID, userID int, groupID *int, requiredPerm string
 	// Check group scope — members of same group have access
 	var fileGroupID *int
 	var scope string
-	err = d.QueryRow(`SELECT group_id, scope FROM files WHERE id = $1`, fileID).Scan(&fileGroupID, &scope)
+	var visibility string
+	err = d.QueryRow(`SELECT group_id, scope, visibility FROM files WHERE id = $1`, fileID).Scan(&fileGroupID, &scope, &visibility)
 	if err != nil {
 		return false, err
 	}
 	if scope == "group" && fileGroupID != nil && groupID != nil && *fileGroupID == *groupID {
 		return true, nil
+	}
+
+	// Check visibility
+	if visibility == "public" && requiredPerm == "view" {
+		return true, nil
+	}
+	if visibility == "group" && requiredPerm == "view" && groupID != nil {
+		var ownerGroupID *int
+		_ = d.QueryRow(`SELECT group_id FROM users WHERE id = $1`, ownerID).Scan(&ownerGroupID)
+		if ownerGroupID != nil && *ownerGroupID == *groupID {
+			return true, nil
+		}
 	}
 
 	// Check explicit share

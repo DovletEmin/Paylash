@@ -86,6 +86,11 @@ input,select,textarea{font-family:var(--font);outline:none}
   padding:0 24px;gap:16px;background:var(--surface);position:sticky;top:0;z-index:50;
 }
 .topbar-title{font-size:.9rem;font-weight:600;color:var(--text)}
+.topbar-right{margin-left:auto;display:flex;align-items:center;gap:8px}
+.topbar-right .btn svg{width:16px;height:16px}
+.theme-icon-light{display:none}
+html.light .theme-icon-dark{display:none}
+html.light .theme-icon-light{display:inline}
 .sidebar-toggle{display:none;color:var(--text-2);padding:6px;border-radius:var(--r)}
 .sidebar-toggle:hover{background:var(--surface-2)}
 .sidebar-toggle svg{width:18px;height:18px}
@@ -359,6 +364,13 @@ select.form-control,select.form-input{appearance:none;cursor:pointer;background-
 .toggle-switch input:checked+.toggle-slider{background:var(--primary)}
 .toggle-switch input:checked+.toggle-slider::before{transform:translateX(16px)}
 
+/* ─── Visibility Buttons ─── */
+.visibility-buttons{display:flex;gap:4px}
+.vis-btn{border:1px solid var(--border);color:var(--text-2);background:var(--bg);transition:all var(--tr);font-size:.78rem !important;padding:6px 12px !important}
+.vis-btn:hover{background:var(--surface-2);color:var(--text);border-color:var(--border-2)}
+.vis-btn.active{background:var(--primary-bg);color:var(--primary);border-color:var(--primary)}
+.vis-status{font-size:.78rem;color:var(--text-3);margin-top:6px}
+
 /* ─── Editor ─── */
 .editor-page{position:fixed;inset:0;z-index:250;background:var(--bg);display:flex;flex-direction:column}
 .editor-toolbar{
@@ -389,6 +401,36 @@ select.form-control,select.form-input{appearance:none;cursor:pointer;background-
 @keyframes slideOut{from{opacity:1;transform:translateX(0)}to{opacity:0;transform:translateX(32px)}}
 @keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
 @keyframes spin{to{transform:rotate(360deg)}}
+
+/* ─── Light Theme ─── */
+html.light {
+  --bg: #f8fafc;
+  --bg-subtle: #f1f5f9;
+  --surface: #ffffff;
+  --surface-2: #f1f5f9;
+  --surface-3: #e2e8f0;
+  --border: #e2e8f0;
+  --border-2: #cbd5e1;
+  --text: #0f172a;
+  --text-2: #64748b;
+  --text-3: #94a3b8;
+  --primary: #6366f1;
+  --primary-h: #4f46e5;
+  --primary-bg: rgba(99,102,241,.1);
+  --success: #16a34a;
+  --success-bg: rgba(22,163,74,.1);
+  --danger: #dc2626;
+  --danger-bg: rgba(220,38,38,.08);
+  --warn: #ca8a04;
+  --warn-bg: rgba(202,138,4,.1);
+  --purple: #9333ea;
+  --purple-bg: rgba(147,51,234,.08);
+}
+html.light .sidebar{border-right-color:#e2e8f0;box-shadow:1px 0 3px rgba(0,0,0,.04)}
+html.light .modal{box-shadow:0 16px 48px rgba(0,0,0,.12)}
+html.light .toast{box-shadow:0 4px 16px rgba(0,0,0,.08)}
+html.light .upload-progress{box-shadow:0 8px 32px rgba(0,0,0,.1)}
+html.light .context-menu{box-shadow:0 8px 32px rgba(0,0,0,.1)}
 
 /* ─── Utility ─── */
 .hidden{display:none!important}

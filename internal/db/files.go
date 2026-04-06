@@ -9,20 +9,23 @@ import (
 // Files
 
 func (d *DB) CreateFile(f *models.File) error {
+	if f.Visibility == "" {
+		f.Visibility = "private"
+	}
 	return d.QueryRow(
-		`INSERT INTO files (name, mime_type, size_bytes, minio_bucket, minio_key, folder_id, owner_id, group_id, scope)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		`INSERT INTO files (name, mime_type, size_bytes, minio_bucket, minio_key, folder_id, owner_id, group_id, scope, visibility)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 		 RETURNING id, created_at, updated_at`,
-		f.Name, f.MimeType, f.SizeBytes, f.MinioBucket, f.MinioKey, f.FolderID, f.OwnerID, f.GroupID, f.Scope,
+		f.Name, f.MimeType, f.SizeBytes, f.MinioBucket, f.MinioKey, f.FolderID, f.OwnerID, f.GroupID, f.Scope, f.Visibility,
 	).Scan(&f.ID, &f.CreatedAt, &f.UpdatedAt)
 }
 
 func (d *DB) GetFile(id int) (*models.File, error) {
 	f := &models.File{}
 	err := d.QueryRow(
-		`SELECT id, name, mime_type, size_bytes, minio_bucket, minio_key, folder_id, owner_id, group_id, scope, version, created_at, updated_at
+		`SELECT id, name, mime_type, size_bytes, minio_bucket, minio_key, folder_id, owner_id, group_id, scope, visibility, version, created_at, updated_at
 		 FROM files WHERE id = $1`, id,
-	).Scan(&f.ID, &f.Name, &f.MimeType, &f.SizeBytes, &f.MinioBucket, &f.MinioKey, &f.FolderID, &f.OwnerID, &f.GroupID, &f.Scope, &f.Version, &f.CreatedAt, &f.UpdatedAt)
+	).Scan(&f.ID, &f.Name, &f.MimeType, &f.SizeBytes, &f.MinioBucket, &f.MinioKey, &f.FolderID, &f.OwnerID, &f.GroupID, &f.Scope, &f.Visibility, &f.Version, &f.CreatedAt, &f.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -30,7 +33,7 @@ func (d *DB) GetFile(id int) (*models.File, error) {
 }
 
 func (d *DB) ListFiles(ownerID int, groupID *int, scope string, folderID *int, sort, order string) ([]models.File, error) {
-	q := `SELECT id, name, mime_type, size_bytes, minio_bucket, minio_key, folder_id, owner_id, group_id, scope, version, created_at, updated_at FROM files WHERE scope = $1`
+	q := `SELECT id, name, mime_type, size_bytes, minio_bucket, minio_key, folder_id, owner_id, group_id, scope, visibility, version, created_at, updated_at FROM files WHERE scope = $1`
 	args := []any{scope}
 	n := 1
 
@@ -74,7 +77,7 @@ func (d *DB) ListFiles(ownerID int, groupID *int, scope string, folderID *int, s
 	var files []models.File
 	for rows.Next() {
 		var f models.File
-		if err := rows.Scan(&f.ID, &f.Name, &f.MimeType, &f.SizeBytes, &f.MinioBucket, &f.MinioKey, &f.FolderID, &f.OwnerID, &f.GroupID, &f.Scope, &f.Version, &f.CreatedAt, &f.UpdatedAt); err != nil {
+		if err := rows.Scan(&f.ID, &f.Name, &f.MimeType, &f.SizeBytes, &f.MinioBucket, &f.MinioKey, &f.FolderID, &f.OwnerID, &f.GroupID, &f.Scope, &f.Visibility, &f.Version, &f.CreatedAt, &f.UpdatedAt); err != nil {
 			return nil, err
 		}
 		files = append(files, f)
@@ -98,7 +101,7 @@ func (d *DB) UpdateFileVersion(id int, sizeBytes int64) error {
 }
 
 func (d *DB) SearchFiles(ownerID int, groupID *int, query string) ([]models.File, error) {
-	q := `SELECT id, name, mime_type, size_bytes, minio_bucket, minio_key, folder_id, owner_id, group_id, scope, version, created_at, updated_at
+	q := `SELECT id, name, mime_type, size_bytes, minio_bucket, minio_key, folder_id, owner_id, group_id, scope, visibility, version, created_at, updated_at
 	      FROM files WHERE name ILIKE $1 AND (owner_id = $2`
 	args := []any{"%" + query + "%", ownerID}
 	if groupID != nil {
@@ -117,12 +120,17 @@ func (d *DB) SearchFiles(ownerID int, groupID *int, query string) ([]models.File
 	var files []models.File
 	for rows.Next() {
 		var f models.File
-		if err := rows.Scan(&f.ID, &f.Name, &f.MimeType, &f.SizeBytes, &f.MinioBucket, &f.MinioKey, &f.FolderID, &f.OwnerID, &f.GroupID, &f.Scope, &f.Version, &f.CreatedAt, &f.UpdatedAt); err != nil {
+		if err := rows.Scan(&f.ID, &f.Name, &f.MimeType, &f.SizeBytes, &f.MinioBucket, &f.MinioKey, &f.FolderID, &f.OwnerID, &f.GroupID, &f.Scope, &f.Visibility, &f.Version, &f.CreatedAt, &f.UpdatedAt); err != nil {
 			return nil, err
 		}
 		files = append(files, f)
 	}
 	return files, rows.Err()
+}
+
+func (d *DB) SetFileVisibility(fileID int, visibility string) error {
+	_, err := d.Exec(`UPDATE files SET visibility = $1, updated_at = NOW() WHERE id = $2`, visibility, fileID)
+	return err
 }
 
 func (d *DB) GetStorageUsage(ownerID int, scope string, groupID *int) (*models.StorageUsage, error) {

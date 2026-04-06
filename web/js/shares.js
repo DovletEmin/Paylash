@@ -34,6 +34,7 @@ const SharesPage = {
     },
 
     showShareModal(file) {
+        const vis = file.visibility || 'private';
         UI.showModal(`"${UI.esc(file.name)}" paýlaş`, `
             <div class="form-group">
                 <label>Ulanyjy gözle</label>
@@ -49,14 +50,15 @@ const SharesPage = {
             </div>
             <hr style="border:none;border-top:1px solid var(--border);margin:14px 0">
             <div class="form-group">
-                <div class="share-public-row">
-                    <label style="margin-bottom:0">Köpçülige açyk</label>
-                    <label class="toggle-switch">
-                        <input type="checkbox" id="share-public" onchange="SharesPage.togglePublicShare(${file.id}, this.checked)">
-                        <span class="toggle-slider"></span>
-                    </label>
+                <label>Görnüşi</label>
+                <div class="visibility-buttons" id="vis-buttons">
+                    <button class="btn btn-sm vis-btn ${vis === 'private' ? 'active' : ''}" data-vis="private" onclick="SharesPage.setVisibility(${file.id},'private')">🔒 Şahsy</button>
+                    <button class="btn btn-sm vis-btn ${vis === 'group' ? 'active' : ''}" data-vis="group" onclick="SharesPage.setVisibility(${file.id},'group')">👥 Topar</button>
+                    <button class="btn btn-sm vis-btn ${vis === 'public' ? 'active' : ''}" data-vis="public" onclick="SharesPage.setVisibility(${file.id},'public')">🌐 Umumy</button>
                 </div>
-                <div id="share-public-link" class="share-public-link hidden"></div>
+                <div id="vis-status" class="vis-status" style="font-size:.78rem;color:var(--text-3);margin-top:6px">
+                    ${vis === 'public' ? 'Ähli ulanyjylar görüp biler' : vis === 'group' ? 'Topardaşlaryňyz görüp biler' : 'Diňe siz we paýlaşylanlar'}
+                </div>
             </div>
             <div id="share-existing"><p class="text-muted">Ýüklenýär…</p></div>`, '');
         this._currentFile = file;
@@ -100,14 +102,14 @@ const SharesPage = {
         } catch (e) { UI.toast(e.message, 'error'); }
     },
 
-    async togglePublicShare(fileId, isPublic) {
-        const el = document.getElementById('share-public-link');
+    async setVisibility(fileId, visibility) {
         try {
-            await API.sharing.setPublic(fileId, isPublic);
-            if (isPublic) {
-                el.innerHTML = '<span class="text-muted" style="font-size:.82rem">Köpçülige açyk edildi ✓</span>';
-                el.classList.remove('hidden');
-            } else { el.classList.add('hidden'); el.innerHTML = ''; }
+            await API.sharing.setVisibility(fileId, visibility);
+            document.querySelectorAll('.vis-btn').forEach(b => b.classList.toggle('active', b.dataset.vis === visibility));
+            const st = document.getElementById('vis-status');
+            if (st) st.textContent = visibility === 'public' ? 'Ähli ulanyjylar görüp biler' : visibility === 'group' ? 'Topardaşlaryňyz görüp biler' : 'Diňe siz we paýlaşylanlar';
+            if (this._currentFile) this._currentFile.visibility = visibility;
+            UI.toast('Görnüşi üýtgedildi', 'success');
         } catch (e) { UI.toast(e.message, 'error'); }
     },
 

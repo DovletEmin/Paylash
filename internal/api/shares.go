@@ -115,6 +115,38 @@ func (h *Handler) SetPublicShare(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
+func (h *Handler) SetVisibility(w http.ResponseWriter, r *http.Request) {
+	user := authutil.GetUser(r)
+	fileID, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "nädogry ID")
+		return
+	}
+	f, err := h.db.GetFile(fileID)
+	if err != nil || f == nil {
+		writeError(w, http.StatusNotFound, "faýl tapylmady")
+		return
+	}
+	if f.OwnerID != user.ID && user.Role != "admin" {
+		writeError(w, http.StatusForbidden, "rugsat ýok")
+		return
+	}
+	var req models.VisibilityRequest
+	if err := readJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "nädogry maglumat")
+		return
+	}
+	if req.Visibility != "private" && req.Visibility != "group" && req.Visibility != "public" {
+		writeError(w, http.StatusBadRequest, "visibility 'private', 'group' ýa-da 'public' bolmaly")
+		return
+	}
+	if err := h.db.SetFileVisibility(fileID, req.Visibility); err != nil {
+		writeError(w, http.StatusInternalServerError, "üýtgedip bolmady")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok", "visibility": req.Visibility})
+}
+
 func (h *Handler) SharedWithMe(w http.ResponseWriter, r *http.Request) {
 	user := authutil.GetUser(r)
 	list, err := h.db.GetSharedWithMe(user.ID, user.GroupID)
@@ -213,7 +245,7 @@ func (h *Handler) CollaboraEditorURL(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Build Collabora URL — WOPI src needs to point back to our server from Collabora's perspective
-	wopiSrc := "http://host.docker.internal:" + strconv.Itoa(h.cfg.Port) + "/wopi/files/" + strconv.Itoa(fileID)
+	wopiSrc := h.cfg.BaseURL + "/wopi/files/" + strconv.Itoa(fileID)
 	editorURL := h.cfg.CollaboraURL + "/browser/dist/cool.html?WOPISrc=" + wopiSrc + "&access_token=" + token.Token
 
 	writeJSON(w, http.StatusOK, map[string]string{
