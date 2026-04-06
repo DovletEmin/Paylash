@@ -132,23 +132,25 @@ const AdminPage = {
             for (const f of facs) { const cs = (await API.catalogs.courses(f.id)) || []; for (const c of cs) { const gs = await API.catalogs.groups(c.id); if (gs) all.push(...gs.map(g => ({ ...g, course_name: c.name, faculty_name: f.name }))); } }
             el.innerHTML = `
             <div class="admin-header"><h2>Toparlar</h2><div style="display:flex;gap:8px"><button class="btn btn-ghost btn-sm" onclick="AdminPage.showBulkGroupQuota()">📊 Kwota hemmesine</button><button class="btn btn-primary btn-sm" onclick="AdminPage.showGroupModal()">${UI.icons.plus} Täze</button></div></div>
-            <table class="admin-table"><thead><tr><th>ID</th><th>Ady</th><th>Ugur</th><th>Fakultet</th><th>Hereketler</th></tr></thead><tbody>
-            ${all.map(g => `<tr><td>${g.id}</td><td>${UI.esc(g.name)}</td><td>${UI.esc(g.course_name)}</td><td>${UI.esc(g.faculty_name)}</td><td>
-                <button class="btn btn-sm btn-ghost" onclick="AdminPage.showGroupModal(${g.id},'${UI.esc(g.name)}',${g.course_id})">✏️</button>
+            <table class="admin-table"><thead><tr><th>ID</th><th>Ady</th><th>Ugur</th><th>Fakultet</th><th>Kwota</th><th>Hereketler</th></tr></thead><tbody>
+            ${all.map(g => `<tr><td>${g.id}</td><td>${UI.esc(g.name)}</td><td>${UI.esc(g.course_name)}</td><td>${UI.esc(g.faculty_name)}</td><td>${UI.formatBytes(g.quota_bytes || 0)}</td><td>
+                <button class="btn btn-sm btn-ghost" onclick="AdminPage.showGroupModal(${g.id},'${UI.esc(g.name)}',${g.course_id},${g.quota_bytes||0})">✏️</button>
                 <button class="btn btn-sm btn-danger" onclick="AdminPage.deleteGroup(${g.id})">🗑</button></td></tr>`).join('')}
-            ${!all.length ? '<tr><td colspan="5" class="text-muted text-center">Topar ýok</td></tr>' : ''}
+            ${!all.length ? '<tr><td colspan="6" class="text-muted text-center">Topar ýok</td></tr>' : ''}
             </tbody></table>`;
         } catch (e) { el.innerHTML = `<p class="text-muted">${UI.esc(e.message)}</p>`; }
     },
 
-    async showGroupModal(id, name, courseId) {
+    async showGroupModal(id, name, courseId, quotaBytes) {
         let facs = []; try { facs = (await API.admin.faculties.list()) || []; } catch {}
         const edit = !!id;
+        const quotaMB = Math.round((quotaBytes || 5368709120) / (1024 * 1024));
         const fOpts = facs.map(f => `<option value="${f.id}">${UI.esc(f.name)}</option>`).join('');
         UI.showModal(edit ? 'Topary üýtget' : 'Täze topar',
             `<div class="form-group"><label>Fakultet</label><select id="grp-faculty" class="form-control" onchange="AdminPage.onGroupFacultyChange()"><option value="">Saýlaň…</option>${fOpts}</select></div>
              <div class="form-group"><label>Ugur</label><select id="grp-course" class="form-control" disabled><option value="">Ilki fakultet saýlaň</option></select></div>
-             <div class="form-group"><label>Ady</label><input type="text" id="grp-name" value="${name||''}" class="form-control" placeholder="Topar ady"></div>`,
+             <div class="form-group"><label>Ady</label><input type="text" id="grp-name" value="${name||''}" class="form-control" placeholder="Topar ady"></div>
+             <div class="form-group"><label>Kwota (MB)</label><input type="number" id="grp-quota" value="${quotaMB}" class="form-control" min="1"></div>`,
             `<button class="btn btn-ghost" onclick="UI.closeModal()">Ýatyrmak</button><button class="btn btn-primary" onclick="AdminPage.saveGroup(${id||'null'})">${edit ? 'Üýtget' : 'Döret'}</button>`);
     },
     async onGroupFacultyChange() {
@@ -160,8 +162,10 @@ const AdminPage = {
     },
     async saveGroup(id) {
         const n = document.getElementById('grp-name').value.trim(), cId = parseInt(document.getElementById('grp-course').value);
+        const quotaMB = parseInt(document.getElementById('grp-quota').value) || 5120;
+        const quotaBytes = quotaMB * 1024 * 1024;
         if (!n || !cId) { UI.toast('Ähli meýdanlary dolduryň', 'error'); return; }
-        try { if (id) await API.admin.groups.update(id, n, cId); else await API.admin.groups.create(n, cId); UI.closeModal(); UI.toast(id ? 'Üýtgedildi' : 'Döredildi', 'success'); this.switchTab('groups'); } catch (e) { UI.toast(e.message, 'error'); }
+        try { if (id) await API.admin.groups.update(id, n, quotaBytes); else await API.admin.groups.create(n, cId, quotaBytes); UI.closeModal(); UI.toast(id ? 'Üýtgedildi' : 'Döredildi', 'success'); this.switchTab('groups'); } catch (e) { UI.toast(e.message, 'error'); }
     },
     async deleteGroup(id) {
         if (!confirm('Bu topary pozmak isleýärsiňizmi?')) return;
@@ -177,6 +181,7 @@ const AdminPage = {
                 <div style="display:flex;gap:8px;align-items:center">
                     <input type="text" id="admin-user-search" class="form-control" placeholder="Gözle…" style="width:200px" oninput="AdminPage.filterUsers(this.value)">
                     <button class="btn btn-ghost btn-sm" onclick="AdminPage.showBulkUserQuota()">📊 Kwota hemmesine</button>
+                    <button class="btn btn-ghost btn-sm" onclick="AdminPage.showImportModal()">📥 Import</button>
                     <button class="btn btn-primary btn-sm" onclick="AdminPage.showCreateUserModal()">${UI.icons.plus} Täze</button>
                 </div>
             </div>
@@ -289,5 +294,40 @@ const AdminPage = {
         const mb = parseInt(document.getElementById('bulk-group-quota').value) || 0;
         if (mb <= 0) { UI.toast('Dogry kwota giriziň', 'error'); return; }
         try { await API.admin.groups.bulkQuota(mb); UI.closeModal(); UI.toast('Ähli toparlaryň kwotasy üýtgedildi', 'success'); this.switchTab('groups'); } catch (e) { UI.toast(e.message, 'error'); }
+    },
+
+    showImportModal() {
+        UI.showModal('Ulanyjylary import etmek', `
+            <p class="text-muted" style="font-size:.82rem;margin-bottom:12px">CSV ýa-da XLSX faýly ýükläň. Faýl formaty:<br>
+            <code style="font-size:.75rem">username, password, full_name, group_id, quota_mb</code></p>
+            <div class="form-group">
+                <input type="file" id="import-file" class="form-control" accept=".csv,.xlsx,.xls">
+            </div>
+            <div id="import-results" style="display:none;max-height:200px;overflow:auto;margin-top:8px"></div>`,
+            `<button class="btn btn-ghost" onclick="UI.closeModal()">Ýatyr</button><button class="btn btn-primary" id="import-btn" onclick="AdminPage.doImportUsers()">Import et</button>`);
+    },
+
+    async doImportUsers() {
+        const fileInput = document.getElementById('import-file');
+        const file = fileInput?.files[0];
+        if (!file) { UI.toast('Faýl saýlaň', 'error'); return; }
+        const btn = document.getElementById('import-btn');
+        btn.disabled = true; btn.textContent = 'Ýüklenýär…';
+        try {
+            const result = await API.admin.users.importFile(file);
+            const el = document.getElementById('import-results');
+            el.style.display = 'block';
+            let html = `<p style="font-weight:600;margin-bottom:6px">Netije: ${result.created}/${result.total} döredildi</p>`;
+            if (result.results) {
+                html += '<div style="font-size:.78rem">';
+                result.results.forEach(r => {
+                    html += `<div style="padding:2px 0;color:${r.success ? 'var(--success)' : 'var(--danger)'}">${UI.esc(r.username)}: ${r.success ? '✓ döredildi' : '✕ ' + UI.esc(r.error)}</div>`;
+                });
+                html += '</div>';
+            }
+            el.innerHTML = html;
+            if (result.created > 0) this.switchTab('users');
+        } catch (e) { UI.toast(e.message, 'error'); }
+        finally { btn.disabled = false; btn.textContent = 'Import et'; }
     }
 };

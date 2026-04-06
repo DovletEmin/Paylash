@@ -1,12 +1,16 @@
 package api
 
 import (
+	"encoding/csv"
+	"fmt"
 	"net/http"
 	"paylash/internal/authutil"
 	"paylash/internal/models"
 	"paylash/internal/storage"
 	"strconv"
 	"strings"
+
+	"github.com/xuri/excelize/v2"
 )
 
 // Admin Dashboard
@@ -329,4 +333,135 @@ func (h *Handler) AdminBulkGroupQuota(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+func (h *Handler) AdminImportUsers(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseMultipartForm(10 << 20); err != nil {
+		writeError(w, http.StatusBadRequest, "faýl juda uly")
+		return
+	}
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "faýl tapylmady")
+		return
+	}
+	defer file.Close()
+
+	name := strings.ToLower(header.Filename)
+	var rows [][]string
+
+	if strings.HasSuffix(name, ".xlsx") || strings.HasSuffix(name, ".xls") {
+		xlsx, err := excelize.OpenReader(file)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "XLSX faýly okap bolmady")
+			return
+		}
+		defer xlsx.Close()
+		sheet := xlsx.GetSheetName(0)
+		rows, err = xlsx.GetRows(sheet)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "XLSX sahypasyny okap bolmady")
+			return
+		}
+	} else {
+		reader := csv.NewReader(file)
+		reader.LazyQuotes = true
+		reader.TrimLeadingSpace = true
+		rows, err = reader.ReadAll()
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "CSV faýly okap bolmady")
+			return
+		}
+	}
+
+	if len(rows) < 2 {
+		writeError(w, http.StatusBadRequest, "faýlda maglumat ýok (diňe başlyk bar)")
+		return
+	}
+
+	type importResult struct {
+		Username string `json:"username"`
+		Success  bool   `json:"success"`
+		Error    string `json:"error,omitempty"`
+	}
+	var results []importResult
+	created := 0
+
+	for i, row := range rows[1:] {
+		if len(row) < 4 {
+			results = append(results, importResult{Username: fmt.Sprintf("setir %d", i+2), Error: "ýeterlik sütün ýok"})
+			continue
+		}
+		username := strings.TrimSpace(row[0])
+		password := strings.TrimSpace(row[1])
+		fullName := strings.TrimSpace(row[2])
+		groupID, _ := strconv.Atoi(strings.TrimSpace(row[3]))
+		quotaMB := 10240
+		if len(row) >= 5 {
+			if q, err := strconv.Atoi(strings.TrimSpace(row[4])); err == nil && q > 0 {
+				quotaMB = q
+			}
+		}
+
+		if len(username) < 3 {
+			results = append(results, importResult{Username: username, Error: "ulanyjy ady azyndan 3 harp"})
+			continue
+		}
+		if len(password) < 6 {
+			results = append(results, importResult{Username: username, Error: "parol azyndan 6 simwol"})
+			continue
+		}
+		if groupID == 0 {
+			results = append(results, importResult{Username: username, Error: "topar ID girizilmeli"})
+			continue
+		}
+
+		exists, _ := h.db.UserExists(username)
+		if exists {
+			results = append(results, importResult{Username: username, Error: "eýýäm bar"})
+			continue
+		}
+
+		hash, err := authutil.HashPassword(password)
+		if err != nil {
+			results = append(results, importResult{Username: username, Error: "parol hashlap bolmady"})
+			continue
+		}
+
+		// Look up group to find faculty_id and course_id
+		grp, err := h.db.GetGroup(groupID)
+		if err != nil || grp == nil {
+			results = append(results, importResult{Username: username, Error: "topar tapylmady"})
+			continue
+		}
+
+		regReq := &models.RegisterRequest{
+			Username: username,
+			Password: password,
+			FullName: fullName,
+			GroupID:  groupID,
+			CourseID: grp.CourseID,
+		}
+		user, err := h.db.CreateUser(regReq, hash)
+		if err != nil {
+			results = append(results, importResult{Username: username, Error: "döredip bolmady"})
+			continue
+		}
+
+		if quotaMB > 0 {
+			h.db.UpdateUser(user.ID, "user", int64(quotaMB)*1024*1024, &groupID)
+		}
+
+		bucket := storage.PersonalBucket(user.ID)
+		h.minio.EnsureBucket(r.Context(), bucket)
+
+		results = append(results, importResult{Username: username, Success: true})
+		created++
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"created": created,
+		"total":   len(rows) - 1,
+		"results": results,
+	})
 }
