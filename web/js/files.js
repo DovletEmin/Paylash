@@ -1,7 +1,7 @@
-// Paylash — File Manager — Turkmen UI
+/* Paylash — File Manager */
 const FilesPage = {
     currentFolder: null,
-    currentScope: 'personal', // 'personal' or 'group'
+    currentScope: 'personal',
     viewMode: 'grid',
     breadcrumbs: [],
     files: [],
@@ -12,31 +12,25 @@ const FilesPage = {
         <div class="files-page">
             <div class="files-toolbar">
                 <div class="files-toolbar-left">
-                    <div class="breadcrumbs" id="breadcrumbs"></div>
+                    <div class="scope-toggle">
+                        <button class="btn btn-sm ${this.currentScope === 'personal' ? 'active' : ''}" onclick="FilesPage.setScope('personal')">Şahsy</button>
+                        <button class="btn btn-sm ${this.currentScope === 'group' ? 'active' : ''}" onclick="FilesPage.setScope('group')">Topar</button>
+                    </div>
                 </div>
                 <div class="files-toolbar-right">
-                    <div class="scope-toggle">
-                        <button class="btn btn-sm ${this.currentScope === 'personal' ? 'btn-primary' : 'btn-ghost'}" onclick="FilesPage.setScope('personal')">Şahsy</button>
-                        <button class="btn btn-sm ${this.currentScope === 'group' ? 'btn-primary' : 'btn-ghost'}" onclick="FilesPage.setScope('group')">Topar</button>
-                    </div>
                     <div class="search-box">
                         <span class="search-icon">${UI.icons.search}</span>
-                        <input type="text" id="file-search" placeholder="Gözle..." oninput="FilesPage.onSearch(this.value)">
+                        <input type="text" id="file-search" placeholder="Gözle…" oninput="FilesPage.onSearch(this.value)">
                     </div>
-                    <button class="btn btn-icon ${this.viewMode === 'grid' ? 'active' : ''}" onclick="FilesPage.setView('grid')" title="Setka">${UI.icons.grid}</button>
-                    <button class="btn btn-icon ${this.viewMode === 'list' ? 'active' : ''}" onclick="FilesPage.setView('list')" title="Sanaw">${UI.icons.list}</button>
+                    <button class="btn btn-icon btn-ghost ${this.viewMode === 'grid' ? 'active' : ''}" onclick="FilesPage.setView('grid')" title="Setka">${UI.icons.grid}</button>
+                    <button class="btn btn-icon btn-ghost ${this.viewMode === 'list' ? 'active' : ''}" onclick="FilesPage.setView('list')" title="Sanaw">${UI.icons.list}</button>
                 </div>
             </div>
-
             <div class="files-actions">
-                <button class="btn btn-primary" onclick="FilesPage.showUploadModal()">
-                    ${UI.icons.upload} <span>Ýükle</span>
-                </button>
-                <button class="btn btn-ghost" onclick="FilesPage.showNewFolderModal()">
-                    ${UI.icons.folder} <span>Täze papka</span>
-                </button>
+                <button class="btn btn-primary btn-sm" onclick="FilesPage.showUploadModal()">${UI.icons.upload} Ýükle</button>
+                <button class="btn btn-ghost btn-sm" onclick="FilesPage.showNewFolderModal()">${UI.icons.plus} Täze papka</button>
             </div>
-
+            <div class="breadcrumbs" id="breadcrumbs"></div>
             <div class="dropzone" id="dropzone">
                 <div class="dropzone-content">
                     ${UI.icons.upload}
@@ -44,120 +38,89 @@ const FilesPage = {
                     <input type="file" id="file-input" multiple style="display:none" onchange="FilesPage.handleFileSelect(this.files)">
                 </div>
             </div>
-
             <div id="upload-progress" class="upload-progress hidden"></div>
-
-            <div id="files-content" class="files-content">
-                ${UI.skeletonCards(8)}
-            </div>
-
-            <div class="storage-bar" id="storage-bar"></div>
+            <div id="files-content">${UI.skeletonCards(6)}</div>
+            <div id="storage-bar" class="storage-bar"></div>
         </div>`;
     },
 
-    async init() {
-        await this.loadFiles();
-        this.initDragDrop();
-        this.loadStorageUsage();
-    },
+    async init() { await this.loadFiles(); this.initDragDrop(); this.loadStorageUsage(); },
 
     async loadFiles() {
-        const content = document.getElementById('files-content');
-        if (!content) return;
-        content.innerHTML = UI.skeletonCards(8);
+        const c = document.getElementById('files-content');
+        if (!c) return;
+        c.innerHTML = UI.skeletonCards(6);
         try {
-            const params = { scope: this.currentScope };
-            if (this.currentFolder) params.folder_id = this.currentFolder;
-            const data = await API.files.list(params);
+            const p = { scope: this.currentScope };
+            if (this.currentFolder) p.folder_id = this.currentFolder;
+            const data = await API.files.list(p);
             this.files = data.files || [];
             this.folders = data.folders || [];
             this.breadcrumbs = data.breadcrumbs || [];
             this.renderBreadcrumbs();
             this.renderFiles();
         } catch (err) {
-            content.innerHTML = `<div class="empty-state"><p>Faýllary ýükläp bolmady</p><p class="text-muted">${UI.esc(err.message)}</p></div>`;
+            c.innerHTML = `<div class="empty-state"><p>Faýllary ýükläp bolmady</p><p class="text-muted">${UI.esc(err.message)}</p></div>`;
         }
     },
 
     renderBreadcrumbs() {
         const el = document.getElementById('breadcrumbs');
         if (!el) return;
-        let html = `<a href="#" class="breadcrumb-item" onclick="FilesPage.goToFolder(null);return false">
-            ${this.currentScope === 'personal' ? '🏠 Şahsy' : '👥 Topar'}
-        </a>`;
-        if (this.breadcrumbs.length) {
-            for (const b of this.breadcrumbs) {
-                html += `<span class="breadcrumb-sep">/</span><a href="#" class="breadcrumb-item" onclick="FilesPage.goToFolder(${b.id});return false">${UI.esc(b.name)}</a>`;
-            }
+        let h = `<a class="breadcrumb-item" onclick="FilesPage.goToFolder(null)">${this.currentScope === 'personal' ? 'Şahsy' : 'Topar'}</a>`;
+        for (const b of this.breadcrumbs) {
+            h += `<span class="breadcrumb-sep">/</span><a class="breadcrumb-item" onclick="FilesPage.goToFolder(${b.id})">${UI.esc(b.name)}</a>`;
         }
-        el.innerHTML = html;
+        el.innerHTML = h;
     },
 
     renderFiles() {
-        const content = document.getElementById('files-content');
-        if (!content) return;
+        const c = document.getElementById('files-content');
+        if (!c) return;
         const items = [...this.folders.map(f => ({ ...f, isFolder: true })), ...this.files];
-        if (items.length === 0) {
-            content.innerHTML = `<div class="empty-state">
-                <div class="empty-icon">${UI.icons.folder}</div>
-                <p>Bu ýerde faýl ýok</p>
-                <p class="text-muted">Faýl ýükläň ýa-da papka dörediň</p>
-            </div>`;
+        if (!items.length) {
+            c.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📂</div><p>Bu ýerde faýl ýok</p><p class="text-muted">Faýl ýükläň ýa-da papka dörediň</p></div>';
             return;
         }
-
         if (this.viewMode === 'grid') {
-            let html = '<div class="file-grid">';
-            for (const item of items) {
-                html += this.renderGridCard(item);
-            }
-            content.innerHTML = html + '</div>';
+            c.innerHTML = '<div class="file-grid">' + items.map(i => this.gridCard(i)).join('') + '</div>';
         } else {
-            let html = `<div class="file-list">
-                <div class="file-list-header">
-                    <div class="file-list-name">Ady</div>
-                    <div class="file-list-size">Ölçegi</div>
-                    <div class="file-list-date">Senesi</div>
-                    <div class="file-list-actions"></div>
-                </div>`;
-            for (const item of items) {
-                html += this.renderListRow(item);
-            }
-            content.innerHTML = html + '</div>';
+            c.innerHTML = `<div class="file-list">
+                <div class="file-list-header"><div>Ady</div><div>Ölçegi</div><div>Senesi</div><div></div></div>
+                ${items.map(i => this.listRow(i)).join('')}
+            </div>`;
         }
     },
 
-    renderGridCard(item) {
+    gridCard(item) {
         const icon = UI.fileIcon(item.name, item.isFolder);
         const cls = UI.fileIconClass(item.name, item.isFolder);
-        const dblclick = item.isFolder
-            ? `FilesPage.goToFolder(${item.id})`
+        const dbl = item.isFolder ? `FilesPage.goToFolder(${item.id})`
             : (UI.isCollaboraEditable(item.name) ? `EditorPage.open(${item.id},'${UI.esc(item.name)}')` : `FilesPage.download(${item.id},'${UI.esc(item.name)}')`);
-        return `<div class="file-card ${cls}" ondblclick="${dblclick}" oncontextmenu="FilesPage.showMenu(event, ${JSON.stringify(item).replace(/"/g, '&quot;')})">
-            <div class="file-card-icon">${icon}</div>
+        const itemJson = JSON.stringify(item).replace(/"/g, '&quot;');
+        return `<div class="file-card" ondblclick="${dbl}" oncontextmenu="FilesPage.showMenu(event,${itemJson})">
+            <div class="file-card-icon ${cls}">${icon}</div>
             <div class="file-card-name" title="${UI.esc(item.name)}">${UI.esc(item.name)}</div>
-            ${!item.isFolder ? `<div class="file-card-meta">${UI.formatBytes(item.size_bytes || 0)} · ${UI.formatDate(item.updated_at || item.created_at)}</div>` : `<div class="file-card-meta">Papka</div>`}
+            ${!item.isFolder ? `<div class="file-card-meta">${UI.formatBytes(item.size_bytes || 0)} · ${UI.formatDate(item.updated_at || item.created_at)}</div>` : '<div class="file-card-meta">Papka</div>'}
         </div>`;
     },
 
-    renderListRow(item) {
+    listRow(item) {
         const icon = UI.fileIcon(item.name, item.isFolder);
-        const dblclick = item.isFolder
-            ? `FilesPage.goToFolder(${item.id})`
+        const cls = UI.fileIconClass(item.name, item.isFolder);
+        const dbl = item.isFolder ? `FilesPage.goToFolder(${item.id})`
             : (UI.isCollaboraEditable(item.name) ? `EditorPage.open(${item.id},'${UI.esc(item.name)}')` : `FilesPage.download(${item.id},'${UI.esc(item.name)}')`);
-        return `<div class="file-list-row" ondblclick="${dblclick}" oncontextmenu="FilesPage.showMenu(event, ${JSON.stringify(item).replace(/"/g, '&quot;')})">
-            <div class="file-list-name"><span class="file-list-icon">${icon}</span>${UI.esc(item.name)}</div>
+        const itemJson = JSON.stringify(item).replace(/"/g, '&quot;');
+        return `<div class="file-list-row" ondblclick="${dbl}" oncontextmenu="FilesPage.showMenu(event,${itemJson})">
+            <div class="file-list-name"><span class="file-list-icon ${cls}">${icon}</span>${UI.esc(item.name)}</div>
             <div class="file-list-size">${item.isFolder ? '—' : UI.formatBytes(item.size_bytes || 0)}</div>
             <div class="file-list-date">${UI.formatDate(item.updated_at || item.created_at)}</div>
-            <div class="file-list-actions">
-                <button class="btn btn-icon btn-sm" onclick="FilesPage.showMenu(event, ${JSON.stringify(item).replace(/"/g, '&quot;')})">⋮</button>
-            </div>
+            <div class="file-list-actions"><button class="btn btn-icon btn-sm" onclick="FilesPage.showMenu(event,${itemJson})">⋮</button></div>
         </div>`;
     },
 
     showMenu(e, item) {
-        e.preventDefault();
-        e.stopPropagation();
+        e.preventDefault(); e.stopPropagation();
         const items = [];
         if (item.isFolder) {
             items.push({ action: 'open', label: 'Aç', icon: '📂', handler: () => this.goToFolder(item.id) });
@@ -165,9 +128,7 @@ const FilesPage = {
             items.push({ divider: true });
             items.push({ action: 'delete', label: 'Poz', icon: '🗑', danger: true, handler: () => this.deleteFolder(item) });
         } else {
-            if (UI.isCollaboraEditable(item.name)) {
-                items.push({ action: 'edit', label: 'Redaktirle', icon: '📝', handler: () => EditorPage.open(item.id, item.name) });
-            }
+            if (UI.isCollaboraEditable(item.name)) items.push({ action: 'edit', label: 'Redaktirle', icon: '📝', handler: () => EditorPage.open(item.id, item.name) });
             items.push({ action: 'download', label: 'Ýükle', icon: '📥', handler: () => this.download(item.id, item.name) });
             items.push({ action: 'share', label: 'Paýlaş', icon: '🔗', handler: () => SharesPage.showShareModal(item) });
             items.push({ action: 'rename', label: 'Adyny üýtget', icon: '✏️', handler: () => this.renameFile(item) });
@@ -177,224 +138,102 @@ const FilesPage = {
         UI.showContextMenu(e.clientX, e.clientY, items);
     },
 
-    setScope(scope) {
-        this.currentScope = scope;
-        this.currentFolder = null;
-        this.loadFiles();
+    setScope(s) { this.currentScope = s; this.currentFolder = null; this.loadFiles(); },
+    setView(m) { this.viewMode = m; this.renderFiles(); },
+    goToFolder(id) { this.currentFolder = id; this.loadFiles(); },
+
+    async onSearch(q) {
+        if (!q || q.length < 2) { this.loadFiles(); return; }
+        try { const data = await API.files.search(q); this.files = data || []; this.folders = []; this.breadcrumbs = []; this.renderBreadcrumbs(); this.renderFiles(); } catch {}
     },
 
-    setView(mode) {
-        this.viewMode = mode;
-        this.renderFiles();
-        document.querySelectorAll('.files-toolbar-right .btn-icon').forEach(btn => btn.classList.remove('active'));
-        document.querySelector(`.files-toolbar-right .btn-icon:nth-of-type(${mode === 'grid' ? 1 : 2})`);
-    },
-
-    goToFolder(id) {
-        this.currentFolder = id;
-        this.loadFiles();
-    },
-
-    async onSearch(query) {
-        if (!query || query.length < 2) { this.loadFiles(); return; }
-        try {
-            const data = await API.files.search(query);
-            this.files = data || [];
-            this.folders = [];
-            this.breadcrumbs = [];
-            this.renderBreadcrumbs();
-            this.renderFiles();
-        } catch { /* ignore */ }
-    },
-
-    // Upload
-    showUploadModal() {
-        document.getElementById('file-input').click();
-    },
+    showUploadModal() { document.getElementById('file-input').click(); },
 
     async handleFileSelect(fileList) {
         if (!fileList.length) return;
-        const progressEl = document.getElementById('upload-progress');
-        progressEl.classList.remove('hidden');
-
+        const prog = document.getElementById('upload-progress');
+        prog.classList.remove('hidden');
         for (const file of fileList) {
-            const id = 'up-' + Math.random().toString(36).substr(2, 6);
-            progressEl.innerHTML += `<div class="upload-item" id="${id}">
-                <div class="upload-item-name">${UI.esc(file.name)}</div>
-                <div class="upload-item-bar"><div class="upload-item-fill" id="${id}-fill"></div></div>
-                <div class="upload-item-pct" id="${id}-pct">0%</div>
-            </div>`;
-
+            const id = 'u-' + Math.random().toString(36).substr(2, 6);
+            prog.innerHTML += `<div class="upload-item" id="${id}"><div class="upload-item-name">${UI.esc(file.name)}</div><div class="upload-item-bar"><div class="upload-item-fill" id="${id}-f"></div></div><div class="upload-item-pct" id="${id}-p">0%</div></div>`;
             try {
-                await API.files.upload(file, this.currentScope, this.currentFolder, (pct) => {
-                    const fill = document.getElementById(id + '-fill');
-                    const pctEl = document.getElementById(id + '-pct');
-                    if (fill) fill.style.width = pct + '%';
-                    if (pctEl) pctEl.textContent = Math.round(pct) + '%';
+                await API.files.upload(file, this.currentScope, this.currentFolder, pct => {
+                    const f = document.getElementById(id + '-f'), p = document.getElementById(id + '-p');
+                    if (f) f.style.width = pct + '%'; if (p) p.textContent = Math.round(pct) + '%';
                 });
-                const el = document.getElementById(id);
-                if (el) el.classList.add('upload-done');
+                document.getElementById(id)?.classList.add('upload-done');
             } catch (err) {
                 UI.toast(`"${file.name}" ýüklenip bilmedi: ${err.message}`, 'error');
-                const el = document.getElementById(id);
-                if (el) el.classList.add('upload-error');
+                document.getElementById(id)?.classList.add('upload-error');
             }
         }
-
-        setTimeout(() => { progressEl.innerHTML = ''; progressEl.classList.add('hidden'); }, 2000);
-        this.loadFiles();
-        this.loadStorageUsage();
+        setTimeout(() => { prog.innerHTML = ''; prog.classList.add('hidden'); }, 2000);
+        this.loadFiles(); this.loadStorageUsage();
         document.getElementById('file-input').value = '';
     },
 
     initDragDrop() {
-        const dropzone = document.getElementById('dropzone');
-        if (!dropzone) return;
-        const page = document.querySelector('.files-page');
-
-        ['dragenter', 'dragover'].forEach(evt => {
-            page.addEventListener(evt, (e) => { e.preventDefault(); dropzone.classList.add('active'); });
-        });
-        ['dragleave', 'drop'].forEach(evt => {
-            page.addEventListener(evt, (e) => { e.preventDefault(); dropzone.classList.remove('active'); });
-        });
-        page.addEventListener('drop', (e) => {
-            const files = e.dataTransfer.files;
-            if (files.length) this.handleFileSelect(files);
-        });
+        const dz = document.getElementById('dropzone'), pg = document.querySelector('.files-page');
+        if (!dz || !pg) return;
+        ['dragenter', 'dragover'].forEach(e => pg.addEventListener(e, ev => { ev.preventDefault(); dz.classList.add('active'); }));
+        ['dragleave', 'drop'].forEach(e => pg.addEventListener(e, ev => { ev.preventDefault(); dz.classList.remove('active'); }));
+        pg.addEventListener('drop', e => { if (e.dataTransfer.files.length) this.handleFileSelect(e.dataTransfer.files); });
     },
 
-    download(id, name) {
-        const a = document.createElement('a');
-        a.href = `/api/files/${id}/download`;
-        a.download = name;
-        a.click();
-    },
+    download(id, name) { const a = document.createElement('a'); a.href = `/api/files/${id}/download`; a.download = name; a.click(); },
 
-    // Rename
     renameFile(item) {
-        UI.showModal('Adyny üýtget', `
-            <div class="form-group">
-                <label>Täze ady</label>
-                <input type="text" id="rename-input" value="${UI.esc(item.name)}" class="form-control">
-            </div>`,
-            `<button class="btn btn-ghost" onclick="UI.closeModal()">Ýatyrmak</button>
-             <button class="btn btn-primary" onclick="FilesPage.doRenameFile(${item.id})">Üýtget</button>`
-        );
-        setTimeout(() => { const inp = document.getElementById('rename-input'); if (inp) { inp.focus(); inp.select(); } }, 100);
+        UI.showModal('Adyny üýtget', `<div class="form-group"><label>Täze ady</label><input type="text" id="rename-input" value="${UI.esc(item.name)}" class="form-control"></div>`,
+            `<button class="btn btn-ghost" onclick="UI.closeModal()">Ýatyrmak</button><button class="btn btn-primary" onclick="FilesPage.doRenameFile(${item.id})">Üýtget</button>`);
+        setTimeout(() => { const i = document.getElementById('rename-input'); if (i) { i.focus(); i.select(); } }, 100);
     },
-
     async doRenameFile(id) {
-        const name = document.getElementById('rename-input').value.trim();
-        if (!name) return;
-        try {
-            await API.files.rename(id, name);
-            UI.closeModal();
-            UI.toast('Faýlyň ady üýtgedildi', 'success');
-            this.loadFiles();
-        } catch (err) { UI.toast(err.message, 'error'); }
+        const n = document.getElementById('rename-input').value.trim(); if (!n) return;
+        try { await API.files.rename(id, n); UI.closeModal(); UI.toast('Ady üýtgedildi', 'success'); this.loadFiles(); } catch (e) { UI.toast(e.message, 'error'); }
     },
 
     renameFolder(item) {
-        UI.showModal('Papkanyň adyny üýtget', `
-            <div class="form-group">
-                <label>Täze ady</label>
-                <input type="text" id="rename-input" value="${UI.esc(item.name)}" class="form-control">
-            </div>`,
-            `<button class="btn btn-ghost" onclick="UI.closeModal()">Ýatyrmak</button>
-             <button class="btn btn-primary" onclick="FilesPage.doRenameFolder(${item.id})">Üýtget</button>`
-        );
-        setTimeout(() => { const inp = document.getElementById('rename-input'); if (inp) { inp.focus(); inp.select(); } }, 100);
+        UI.showModal('Papkanyň adyny üýtget', `<div class="form-group"><label>Täze ady</label><input type="text" id="rename-input" value="${UI.esc(item.name)}" class="form-control"></div>`,
+            `<button class="btn btn-ghost" onclick="UI.closeModal()">Ýatyrmak</button><button class="btn btn-primary" onclick="FilesPage.doRenameFolder(${item.id})">Üýtget</button>`);
+        setTimeout(() => { const i = document.getElementById('rename-input'); if (i) { i.focus(); i.select(); } }, 100);
     },
-
     async doRenameFolder(id) {
-        const name = document.getElementById('rename-input').value.trim();
-        if (!name) return;
-        try {
-            await API.folders.rename(id, name);
-            UI.closeModal();
-            UI.toast('Papkanyň ady üýtgedildi', 'success');
-            this.loadFiles();
-        } catch (err) { UI.toast(err.message, 'error'); }
+        const n = document.getElementById('rename-input').value.trim(); if (!n) return;
+        try { await API.folders.rename(id, n); UI.closeModal(); UI.toast('Ady üýtgedildi', 'success'); this.loadFiles(); } catch (e) { UI.toast(e.message, 'error'); }
     },
 
-    // Delete
     deleteFile(item) {
-        UI.showModal('Faýly pozmak', `
-            <p>"<strong>${UI.esc(item.name)}</strong>" faýlyny pozmak isleýärsiňizmi?</p>
-            <p class="text-muted">Bu hereket yzyna gaýtaryp bolmaýar.</p>`,
-            `<button class="btn btn-ghost" onclick="UI.closeModal()">Ýatyrmak</button>
-             <button class="btn btn-danger" onclick="FilesPage.doDeleteFile(${item.id})">Poz</button>`
-        );
+        UI.showModal('Faýly pozmak',
+            `<p>"<strong>${UI.esc(item.name)}</strong>" faýlyny pozmak isleýärsiňizmi?</p><p class="text-muted">Bu yzyna gaýtaryp bolmaýar.</p>`,
+            `<button class="btn btn-ghost" onclick="UI.closeModal()">Ýatyrmak</button><button class="btn btn-danger" onclick="FilesPage.doDeleteFile(${item.id})">Poz</button>`);
     },
-
-    async doDeleteFile(id) {
-        try {
-            await API.files.delete(id);
-            UI.closeModal();
-            UI.toast('Faýl pozuldy', 'success');
-            this.loadFiles();
-            this.loadStorageUsage();
-        } catch (err) { UI.toast(err.message, 'error'); }
-    },
+    async doDeleteFile(id) { try { await API.files.delete(id); UI.closeModal(); UI.toast('Faýl pozuldy', 'success'); this.loadFiles(); this.loadStorageUsage(); } catch (e) { UI.toast(e.message, 'error'); } },
 
     deleteFolder(item) {
-        UI.showModal('Papkany pozmak', `
-            <p>"<strong>${UI.esc(item.name)}</strong>" papkasyny pozmak isleýärsiňizmi?</p>
-            <p class="text-muted">Papkadaky ähli faýllar pozular.</p>`,
-            `<button class="btn btn-ghost" onclick="UI.closeModal()">Ýatyrmak</button>
-             <button class="btn btn-danger" onclick="FilesPage.doDeleteFolder(${item.id})">Poz</button>`
-        );
+        UI.showModal('Papkany pozmak',
+            `<p>"<strong>${UI.esc(item.name)}</strong>" papkasyny pozmak isleýärsiňizmi?</p><p class="text-muted">Ähli faýllar pozular.</p>`,
+            `<button class="btn btn-ghost" onclick="UI.closeModal()">Ýatyrmak</button><button class="btn btn-danger" onclick="FilesPage.doDeleteFolder(${item.id})">Poz</button>`);
     },
+    async doDeleteFolder(id) { try { await API.folders.delete(id); UI.closeModal(); UI.toast('Papka pozuldy', 'success'); this.loadFiles(); } catch (e) { UI.toast(e.message, 'error'); } },
 
-    async doDeleteFolder(id) {
-        try {
-            await API.folders.delete(id);
-            UI.closeModal();
-            UI.toast('Papka pozuldy', 'success');
-            this.loadFiles();
-        } catch (err) { UI.toast(err.message, 'error'); }
-    },
-
-    // New folder
     showNewFolderModal() {
-        UI.showModal('Täze papka', `
-            <div class="form-group">
-                <label>Papkanyň ady</label>
-                <input type="text" id="new-folder-name" placeholder="Papka ady" class="form-control">
-            </div>`,
-            `<button class="btn btn-ghost" onclick="UI.closeModal()">Ýatyrmak</button>
-             <button class="btn btn-primary" onclick="FilesPage.doCreateFolder()">Döret</button>`
-        );
-        setTimeout(() => { const inp = document.getElementById('new-folder-name'); if (inp) inp.focus(); }, 100);
+        UI.showModal('Täze papka', `<div class="form-group"><label>Papkanyň ady</label><input type="text" id="new-folder-name" class="form-control" placeholder="Papka ady"></div>`,
+            `<button class="btn btn-ghost" onclick="UI.closeModal()">Ýatyrmak</button><button class="btn btn-primary" onclick="FilesPage.doCreateFolder()">Döret</button>`);
+        setTimeout(() => { const i = document.getElementById('new-folder-name'); if (i) i.focus(); }, 100);
     },
-
     async doCreateFolder() {
-        const name = document.getElementById('new-folder-name').value.trim();
-        if (!name) return;
-        try {
-            await API.folders.create(name, this.currentScope, this.currentFolder);
-            UI.closeModal();
-            UI.toast('Papka döredildi', 'success');
-            this.loadFiles();
-        } catch (err) { UI.toast(err.message, 'error'); }
+        const n = document.getElementById('new-folder-name').value.trim(); if (!n) return;
+        try { await API.folders.create(n, this.currentScope, this.currentFolder); UI.closeModal(); UI.toast('Papka döredildi', 'success'); this.loadFiles(); } catch (e) { UI.toast(e.message, 'error'); }
     },
 
-    // Storage usage bar
     async loadStorageUsage() {
         try {
-            const data = await API.files.storageUsage();
+            const d = await API.files.storageUsage();
             const bar = document.getElementById('storage-bar');
             if (!bar) return;
-            const pct = data.quota_bytes > 0 ? Math.min((data.used_bytes / data.quota_bytes) * 100, 100) : 0;
-            bar.innerHTML = `
-                <div class="storage-info">
-                    <span>Saklanylýan ýer: ${UI.formatBytes(data.used_bytes)} / ${UI.formatBytes(data.quota_bytes)}</span>
-                    <span>${Math.round(pct)}%</span>
-                </div>
-                <div class="storage-track">
-                    <div class="storage-fill ${pct > 90 ? 'danger' : pct > 70 ? 'warning' : ''}" style="width:${pct}%"></div>
-                </div>`;
-        } catch { /* ignore */ }
+            const pct = d.quota_bytes > 0 ? Math.min((d.used_bytes / d.quota_bytes) * 100, 100) : 0;
+            bar.innerHTML = `<div class="storage-info"><span>${UI.formatBytes(d.used_bytes)} / ${UI.formatBytes(d.quota_bytes)}</span><span>${Math.round(pct)}%</span></div>
+                <div class="storage-track"><div class="storage-fill ${pct > 90 ? 'danger' : pct > 70 ? 'warning' : ''}" style="width:${pct}%"></div></div>`;
+        } catch {}
     }
 };

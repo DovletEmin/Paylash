@@ -1,24 +1,20 @@
-// Paylash — Auth pages (Login & Register) — Turkmen UI
+/* Paylash — Auth Pages */
 const AuthPage = {
-    faculties: [],
-    courses: [],
-    groups: [],
-
     renderLogin() {
         return `
         <div class="auth-container">
             <div class="auth-card">
-                <div class="auth-logo">${UI.icons.cloud}<span>Paylash</span></div>
+                <div class="auth-logo">${UI.icons.cloud} <span>Paylash</span></div>
                 <h2 class="auth-title">Ulgama giriň</h2>
                 <p class="auth-subtitle">Ulanyjy adyňyzy we parolyňyzy giriziň</p>
                 <form id="login-form" class="auth-form">
                     <div class="form-group">
-                        <label for="login-username">Ulanyjy ady</label>
-                        <input type="text" id="login-username" placeholder="Ulanyjy adyňyz" required autocomplete="username">
+                        <label>Ulanyjy ady</label>
+                        <input type="text" id="login-username" class="form-control" placeholder="Ulanyjy adyňyz" required autocomplete="username">
                     </div>
                     <div class="form-group">
-                        <label for="login-password">Parol</label>
-                        <input type="password" id="login-password" placeholder="Parolyňyz" required autocomplete="current-password">
+                        <label>Parol</label>
+                        <input type="password" id="login-password" class="form-control" placeholder="Parolyňyz" required autocomplete="current-password">
                     </div>
                     <button type="submit" class="btn btn-primary btn-block" id="login-btn">Giriş</button>
                 </form>
@@ -31,39 +27,33 @@ const AuthPage = {
         return `
         <div class="auth-container">
             <div class="auth-card">
-                <div class="auth-logo">${UI.icons.cloud}<span>Paylash</span></div>
+                <div class="auth-logo">${UI.icons.cloud} <span>Paylash</span></div>
                 <h2 class="auth-title">Hasap döretmek</h2>
                 <p class="auth-subtitle">Maglumatyňyzy dolduryň</p>
                 <form id="register-form" class="auth-form">
                     <div class="form-group">
-                        <label for="reg-fullname">Doly adyňyz</label>
-                        <input type="text" id="reg-fullname" placeholder="Mysal: Aman Amanow" required>
+                        <label>Doly adyňyz</label>
+                        <input type="text" id="reg-fullname" class="form-control" placeholder="Mysal: Aman Amanow" required>
                     </div>
                     <div class="form-group">
-                        <label for="reg-username">Ulanyjy ady</label>
-                        <input type="text" id="reg-username" placeholder="Ulanyjy adyňyz" required autocomplete="username">
+                        <label>Ulanyjy ady</label>
+                        <input type="text" id="reg-username" class="form-control" placeholder="Ulanyjy adyňyz" required autocomplete="username">
                     </div>
                     <div class="form-group">
-                        <label for="reg-password">Parol</label>
-                        <input type="password" id="reg-password" placeholder="Iň az 6 simwol" required minlength="6" autocomplete="new-password">
+                        <label>Parol</label>
+                        <input type="password" id="reg-password" class="form-control" placeholder="Iň az 6 simwol" required minlength="6" autocomplete="new-password">
                     </div>
                     <div class="form-group">
-                        <label for="reg-faculty">Fakultet</label>
-                        <select id="reg-faculty" required>
-                            <option value="">Fakultet saýlaň...</option>
-                        </select>
+                        <label>Fakultet</label>
+                        <select id="reg-faculty" class="form-control" required><option value="">Fakultet saýlaň…</option></select>
                     </div>
                     <div class="form-group">
-                        <label for="reg-course">Ugur</label>
-                        <select id="reg-course" required disabled>
-                            <option value="">Ilki fakultet saýlaň</option>
-                        </select>
+                        <label>Ugur</label>
+                        <select id="reg-course" class="form-control" required disabled><option value="">Ilki fakultet saýlaň</option></select>
                     </div>
                     <div class="form-group">
-                        <label for="reg-group">Topar</label>
-                        <select id="reg-group" required disabled>
-                            <option value="">Ilki ugur saýlaň</option>
-                        </select>
+                        <label>Topar</label>
+                        <select id="reg-group" class="form-control" required disabled><option value="">Ilki ugur saýlaň</option></select>
                     </div>
                     <button type="submit" class="btn btn-primary btn-block" id="register-btn">Hasap döret</button>
                 </form>
@@ -78,22 +68,17 @@ const AuthPage = {
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
             const btn = document.getElementById('login-btn');
-            btn.disabled = true;
-            btn.textContent = 'Girilýär...';
+            btn.disabled = true; btn.textContent = 'Girilýär…';
             try {
-                const username = document.getElementById('login-username').value.trim();
-                const password = document.getElementById('login-password').value;
-                if (!username || !password) { UI.toast('Ähli meýdanlary dolduryň', 'error'); return; }
-                await API.auth.login(username, password);
-                UI.toast('Üstünlikli girildi!', 'success');
+                const u = document.getElementById('login-username').value.trim();
+                const p = document.getElementById('login-password').value;
+                if (!u || !p) { UI.toast('Ähli meýdanlary dolduryň', 'error'); return; }
+                await API.auth.login(u, p);
                 await App.checkAuth();
                 App.navigate('files');
             } catch (err) {
                 UI.toast(err.message || 'Giriş ýalňyşlygy', 'error');
-            } finally {
-                btn.disabled = false;
-                btn.textContent = 'Giriş';
-            }
+            } finally { btn.disabled = false; btn.textContent = 'Giriş'; }
         });
     },
 
@@ -101,87 +86,46 @@ const AuthPage = {
         const form = document.getElementById('register-form');
         if (!form) return;
 
-        // Load faculties
         try {
-            this.faculties = await API.catalogs.faculties();
+            const facs = await API.catalogs.faculties();
             const sel = document.getElementById('reg-faculty');
-            this.faculties.forEach(f => {
-                const opt = document.createElement('option');
-                opt.value = f.id;
-                opt.textContent = f.name;
-                sel.appendChild(opt);
-            });
-        } catch { /* ignore */ }
+            (facs || []).forEach(f => { const o = document.createElement('option'); o.value = f.id; o.textContent = f.name; sel.appendChild(o); });
+        } catch {}
 
-        // Cascading selects
         document.getElementById('reg-faculty').addEventListener('change', async (e) => {
-            const courseEl = document.getElementById('reg-course');
-            const groupEl = document.getElementById('reg-group');
-            courseEl.innerHTML = '<option value="">Ugur saýlaň...</option>';
-            groupEl.innerHTML = '<option value="">Ilki ugur saýlaň</option>';
-            groupEl.disabled = true;
-
-            if (!e.target.value) { courseEl.disabled = true; return; }
-            courseEl.disabled = false;
-            try {
-                this.courses = await API.catalogs.courses(e.target.value);
-                this.courses.forEach(c => {
-                    const opt = document.createElement('option');
-                    opt.value = c.id;
-                    opt.textContent = c.name;
-                    courseEl.appendChild(opt);
-                });
-            } catch { courseEl.disabled = true; }
+            const cEl = document.getElementById('reg-course'), gEl = document.getElementById('reg-group');
+            cEl.innerHTML = '<option value="">Ugur saýlaň…</option>'; gEl.innerHTML = '<option value="">Ilki ugur saýlaň</option>'; gEl.disabled = true;
+            if (!e.target.value) { cEl.disabled = true; return; }
+            cEl.disabled = false;
+            try { const cs = await API.catalogs.courses(e.target.value); (cs||[]).forEach(c => { const o = document.createElement('option'); o.value = c.id; o.textContent = c.name; cEl.appendChild(o); }); } catch { cEl.disabled = true; }
         });
 
         document.getElementById('reg-course').addEventListener('change', async (e) => {
-            const groupEl = document.getElementById('reg-group');
-            groupEl.innerHTML = '<option value="">Topar saýlaň...</option>';
-
-            if (!e.target.value) { groupEl.disabled = true; return; }
-            groupEl.disabled = false;
-            try {
-                this.groups = await API.catalogs.groups(e.target.value);
-                this.groups.forEach(g => {
-                    const opt = document.createElement('option');
-                    opt.value = g.id;
-                    opt.textContent = g.name;
-                    groupEl.appendChild(opt);
-                });
-            } catch { groupEl.disabled = true; }
+            const gEl = document.getElementById('reg-group');
+            gEl.innerHTML = '<option value="">Topar saýlaň…</option>';
+            if (!e.target.value) { gEl.disabled = true; return; }
+            gEl.disabled = false;
+            try { const gs = await API.catalogs.groups(e.target.value); (gs||[]).forEach(g => { const o = document.createElement('option'); o.value = g.id; o.textContent = g.name; gEl.appendChild(o); }); } catch { gEl.disabled = true; }
         });
 
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
             const btn = document.getElementById('register-btn');
-            btn.disabled = true;
-            btn.textContent = 'Döredilýär...';
+            btn.disabled = true; btn.textContent = 'Döredilýär…';
             try {
-                const fullName = document.getElementById('reg-fullname').value.trim();
-                const username = document.getElementById('reg-username').value.trim();
-                const password = document.getElementById('reg-password').value;
-                const facultyId = parseInt(document.getElementById('reg-faculty').value);
-                const courseId = parseInt(document.getElementById('reg-course').value);
-                const groupId = parseInt(document.getElementById('reg-group').value);
-
-                if (!fullName || !username || !password || !facultyId || !courseId || !groupId) {
-                    UI.toast('Ähli meýdanlary dolduryň', 'error');
-                    return;
-                }
-                if (password.length < 6) {
-                    UI.toast('Parol iň az 6 simwol bolmaly', 'error');
-                    return;
-                }
-
-                await API.auth.register(username, password, fullName, facultyId, courseId, groupId);
-                UI.toast('Hasap döredildi! Ulgama giriň', 'success');
+                const fn = document.getElementById('reg-fullname').value.trim();
+                const un = document.getElementById('reg-username').value.trim();
+                const pw = document.getElementById('reg-password').value;
+                const fId = parseInt(document.getElementById('reg-faculty').value);
+                const cId = parseInt(document.getElementById('reg-course').value);
+                const gId = parseInt(document.getElementById('reg-group').value);
+                if (!fn || !un || !pw || !fId || !cId || !gId) { UI.toast('Ähli meýdanlary dolduryň', 'error'); return; }
+                if (pw.length < 6) { UI.toast('Parol iň az 6 simwol bolmaly', 'error'); return; }
+                await API.auth.register(un, pw, fn, fId, cId, gId);
+                UI.toast('Hasap döredildi! Giriň', 'success');
                 App.navigate('login');
-            } catch (err) {
-                UI.toast(err.message || 'Hasap döredip bolmady', 'error');
-            } finally {
-                btn.disabled = false;
-                btn.textContent = 'Hasap döret';
-            }
+            } catch (err) { UI.toast(err.message || 'Hasap döredip bolmady', 'error'); }
+            finally { btn.disabled = false; btn.textContent = 'Hasap döret'; }
         });
     }
 };

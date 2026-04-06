@@ -1,4 +1,4 @@
-// Paylash — Collabora Editor — Turkmen UI
+/* Paylash — Editor Page (Collabora) */
 const EditorPage = {
     currentFileId: null,
     currentFileName: '',
@@ -7,22 +7,15 @@ const EditorPage = {
         return `
         <div class="editor-page">
             <div class="editor-toolbar">
-                <button class="btn btn-ghost" onclick="App.navigate('files')">← Yza</button>
-                <span class="editor-filename" id="editor-filename">${UI.esc(this.currentFileName)}</span>
+                <button class="btn btn-ghost btn-sm" onclick="App.navigate('files')">← Yza</button>
+                <span class="editor-filename">${UI.esc(this.currentFileName)}</span>
                 <div class="editor-toolbar-right">
-                    <button class="btn btn-ghost btn-sm" onclick="EditorPage.download()">
-                        ${UI.icons.download} Ýükle
-                    </button>
-                    <button class="btn btn-ghost btn-sm" onclick="SharesPage.showShareModal({id: EditorPage.currentFileId, name: EditorPage.currentFileName})">
-                        ${UI.icons.share} Paýlaş
-                    </button>
+                    <button class="btn btn-ghost btn-sm" onclick="EditorPage.download()">${UI.icons.download} Ýükle</button>
+                    <button class="btn btn-ghost btn-sm" onclick="SharesPage.showShareModal({id:EditorPage.currentFileId,name:EditorPage.currentFileName})">${UI.icons.share} Paýlaş</button>
                 </div>
             </div>
             <div class="editor-container" id="editor-container">
-                <div class="editor-loading">
-                    <div class="spinner"></div>
-                    <p>Redaktor ýüklenýär...</p>
-                </div>
+                <div class="editor-loading"><div class="spinner"></div><p>Redaktor ýüklenýär…</p></div>
             </div>
         </div>`;
     },
@@ -34,26 +27,19 @@ const EditorPage = {
     },
 
     async init() {
-        if (!this.currentFileId) {
-            App.navigate('files');
-            return;
-        }
-        const container = document.getElementById('editor-container');
+        if (!this.currentFileId) { App.navigate('files'); return; }
+        const c = document.getElementById('editor-container');
         try {
             const data = await API.collabora.editorURL(this.currentFileId);
             if (data.editor_url) {
-                container.innerHTML = `<iframe id="collabora-frame" src="${data.editor_url}" class="editor-iframe" allowfullscreen></iframe>`;
+                c.innerHTML = `<iframe src="${data.editor_url}" class="editor-iframe" allowfullscreen></iframe>`;
             } else {
-                container.innerHTML = `<div class="empty-state"><p>Redaktor elýeterli däl</p><p class="text-muted">Collabora Online işleýändigini barlaň</p></div>`;
+                c.innerHTML = '<div class="empty-state"><p>Redaktor elýeterli däl</p><p class="text-muted">Collabora Online işleýändigini barlaň</p></div>';
             }
         } catch (err) {
-            container.innerHTML = `<div class="empty-state"><p>Redaktory açyp bolmady</p><p class="text-muted">${UI.esc(err.message)}</p></div>`;
+            c.innerHTML = `<div class="empty-state"><p>Redaktory açyp bolmady</p><p class="text-muted">${UI.esc(err.message)}</p></div>`;
         }
     },
 
-    download() {
-        if (this.currentFileId) {
-            FilesPage.download(this.currentFileId, this.currentFileName);
-        }
-    }
+    download() { if (this.currentFileId) FilesPage.download(this.currentFileId, this.currentFileName); }
 };
