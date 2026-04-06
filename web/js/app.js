@@ -25,8 +25,8 @@ const App = {
         const path = location.pathname.replace(/^\/+/, '') || '';
         const page = path.split('/')[0] || 'files';
 
-        if (!this.user && !['login', 'register'].includes(page)) { this.navigate('login', true); return; }
-        if (this.user && ['login', 'register'].includes(page)) { this.navigate('files', true); return; }
+        if (!this.user && !['login'].includes(page)) { this.navigate('login', true); return; }
+        if (this.user && ['login'].includes(page)) { this.navigate('files', true); return; }
         if (page === 'admin' && this.user && this.user.role !== 'admin') { this.navigate('files', true); return; }
 
         this.renderPage(page);
@@ -36,9 +36,8 @@ const App = {
         this.currentPage = page;
         const app = document.getElementById('app');
 
-        if (['login', 'register'].includes(page)) {
-            if (page === 'login') { app.innerHTML = AuthPage.renderLogin(); AuthPage.initLogin(); }
-            else { app.innerHTML = AuthPage.renderRegister(); AuthPage.initRegister(); }
+        if (['login'].includes(page)) {
+            app.innerHTML = AuthPage.renderLogin(); AuthPage.initLogin();
             return;
         }
 
@@ -94,7 +93,7 @@ const App = {
                 <div id="storage-bar" class="storage-bar"></div>
                 <div class="sidebar-footer">
                     <div class="sidebar-user" style="cursor:pointer" onclick="App.showProfileModal()">
-                        <div class="sidebar-avatar">${(u.full_name || 'U').charAt(0).toUpperCase()}</div>
+                        ${u.avatar_url ? `<img class="sidebar-avatar-img" src="/api/avatar/${u.id}?v=${Date.now()}" alt="">` : `<div class="sidebar-avatar">${(u.full_name || 'U').charAt(0).toUpperCase()}</div>`}
                         <div class="sidebar-user-info">
                             <div class="sidebar-user-name">${UI.esc(u.full_name)}</div>
                             <div class="sidebar-user-role">${u.role === 'admin' ? 'Admin' : 'Ulanyjy'}</div>
@@ -166,12 +165,37 @@ const App = {
 
     showProfileModal() {
         const u = this.user;
+        const avatarHTML = u.avatar_url
+            ? `<img class="profile-avatar-img" src="/api/avatar/${u.id}?v=${Date.now()}" alt="">`
+            : `<div class="profile-avatar-placeholder">${(u.full_name || 'U').charAt(0).toUpperCase()}</div>`;
         UI.showModal('Profil', `
+            <div class="profile-avatar-section">
+                <div class="profile-avatar-wrap" onclick="document.getElementById('avatar-input').click()">
+                    ${avatarHTML}
+                    <div class="profile-avatar-overlay">📷</div>
+                </div>
+                <input type="file" id="avatar-input" accept="image/*" style="display:none" onchange="App.uploadAvatar(this)">
+                <p class="text-muted" style="font-size:.75rem;margin-top:4px">Üýtgetmek üçin basyň</p>
+            </div>
             <div class="form-group"><label>Doly ady</label><input type="text" id="prof-name" value="${UI.esc(u.full_name)}" class="form-control"></div>
             <hr style="border:none;border-top:1px solid var(--border);margin:12px 0">
             <div class="form-group"><label>K\u00f6ne parol</label>${UI.passwordField('prof-old-pw', 'Di\u0148e \u00fc\u00fdtgetmek \u00fc\u00e7in')}</div>
             <div class="form-group"><label>T\u00e4ze parol</label>${UI.passwordField('prof-new-pw', 'Azyndan 6 simwol')}</div>`,
             `<button class="btn btn-ghost" onclick="UI.closeModal()">\u00ddatyr</button><button class="btn btn-primary" onclick="App.saveProfile()">\u00ddatda sakla</button>`);
+    },
+
+    async uploadAvatar(input) {
+        const file = input.files[0];
+        if (!file) return;
+        if (!file.type.startsWith('image/')) { UI.toast('Diňe surat faýly rugsat berilýär', 'error'); return; }
+        if (file.size > 5 * 1024 * 1024) { UI.toast('Faýl 5MB-dan uly bolmaly däl', 'error'); return; }
+        try {
+            const updated = await API.auth.uploadAvatar(file);
+            this.user = updated;
+            UI.toast('Awatar üýtgedildi', 'success');
+            UI.closeModal();
+            this.renderPage(this.currentPage);
+        } catch (e) { UI.toast(e.message, 'error'); }
     },
 
     async saveProfile() {

@@ -37,7 +37,6 @@ func (s *Server) routes(webFS embed.FS) {
 	wopiH := wopi.NewHandler(s.db, s.minio, s.cfg)
 
 	// Public routes
-	s.mux.HandleFunc("POST /api/auth/register", h.Register)
 	s.mux.HandleFunc("POST /api/auth/login", h.Login)
 	s.mux.HandleFunc("POST /api/auth/logout", h.Logout)
 
@@ -49,6 +48,8 @@ func (s *Server) routes(webFS embed.FS) {
 	// Authenticated routes
 	s.mux.Handle("GET /api/auth/me", auth(http.HandlerFunc(h.Me)))
 	s.mux.Handle("PATCH /api/auth/profile", auth(http.HandlerFunc(h.UpdateProfile)))
+	s.mux.Handle("POST /api/auth/avatar", auth(http.HandlerFunc(h.UploadAvatar)))
+	s.mux.Handle("GET /api/avatar/{id}", auth(http.HandlerFunc(h.ServeAvatar)))
 
 	// Files
 	s.mux.Handle("GET /api/files", auth(http.HandlerFunc(h.ListFiles)))
@@ -94,6 +95,7 @@ func (s *Server) routes(webFS embed.FS) {
 	s.mux.Handle("DELETE /api/admin/users/{id}", auth(AdminMiddleware(http.HandlerFunc(h.AdminDeleteUser))))
 	s.mux.Handle("POST /api/admin/users/bulk-quota", auth(AdminMiddleware(http.HandlerFunc(h.AdminBulkUserQuota))))
 	s.mux.Handle("POST /api/admin/groups/bulk-quota", auth(AdminMiddleware(http.HandlerFunc(h.AdminBulkGroupQuota))))
+	s.mux.Handle("POST /api/admin/users/import", auth(AdminMiddleware(http.HandlerFunc(h.AdminImportUsers))))
 
 	// WOPI endpoints (accessed by Collabora, token-based auth)
 	s.mux.HandleFunc("GET /wopi/files/{id}", wopiH.CheckFileInfo)

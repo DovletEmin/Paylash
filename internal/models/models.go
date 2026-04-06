@@ -12,6 +12,7 @@ type User struct {
 	CourseID     *int      `json:"course_id"`
 	GroupID      *int      `json:"group_id"`
 	QuotaBytes   int64     `json:"quota_bytes"`
+	AvatarURL    string    `json:"avatar_url"`
 	CreatedAt    time.Time `json:"created_at"`
 }
 

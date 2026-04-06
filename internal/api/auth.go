@@ -1,10 +1,13 @@
 package api
 
 import (
+	"fmt"
+	"io"
 	"net/http"
 	"paylash/internal/authutil"
 	"paylash/internal/models"
 	"paylash/internal/storage"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -173,5 +176,96 @@ func (h *Handler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, updated)
 	} else {
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	}
+}
+
+func (h *Handler) UploadAvatar(w http.ResponseWriter, r *http.Request) {
+	user := authutil.GetUser(r)
+	if user == nil {
+		writeError(w, http.StatusUnauthorized, "ulgama giriň")
+		return
+	}
+	if err := r.ParseMultipartForm(5 << 20); err != nil {
+		writeError(w, http.StatusBadRequest, "faýl juda uly (maks 5MB)")
+		return
+	}
+	file, header, err := r.FormFile("avatar")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "faýl tapylmady")
+		return
+	}
+	defer file.Close()
+
+	ct := header.Header.Get("Content-Type")
+	if !strings.HasPrefix(ct, "image/") {
+		writeError(w, http.StatusBadRequest, "diňe surat faýly rugsat berilýär")
+		return
+	}
+
+	bucket := storage.PersonalBucket(user.ID)
+	if err := h.minio.EnsureBucket(r.Context(), bucket); err != nil {
+		writeError(w, http.StatusInternalServerError, "ammar ýalňyşlygy")
+		return
+	}
+	key := fmt.Sprintf("avatar/%d%s", time.Now().Unix(), extFromMime(ct))
+	if err := h.minio.Upload(r.Context(), bucket, key, file, header.Size, ct); err != nil {
+		writeError(w, http.StatusInternalServerError, "ýükläp bolmady")
+		return
+	}
+
+	avatarURL := bucket + "/" + key
+	if err := h.db.UpdateAvatarURL(user.ID, avatarURL); err != nil {
+		writeError(w, http.StatusInternalServerError, "ýatda saklap bolmady")
+		return
+	}
+
+	updated, _ := h.db.GetUserByID(user.ID)
+	if updated != nil {
+		writeJSON(w, http.StatusOK, updated)
+	} else {
+		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	}
+}
+
+func (h *Handler) ServeAvatar(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "nädogry ID")
+		return
+	}
+	user, err := h.db.GetUserByID(id)
+	if err != nil || user == nil || user.AvatarURL == "" {
+		writeError(w, http.StatusNotFound, "awatar tapylmady")
+		return
+	}
+
+	parts := strings.SplitN(user.AvatarURL, "/", 2)
+	if len(parts) != 2 {
+		writeError(w, http.StatusNotFound, "awatar tapylmady")
+		return
+	}
+
+	obj, err := h.minio.Download(r.Context(), parts[0], parts[1])
+	if err != nil {
+		writeError(w, http.StatusNotFound, "awatar tapylmady")
+		return
+	}
+	defer obj.Close()
+
+	w.Header().Set("Cache-Control", "public, max-age=86400")
+	w.Header().Set("Content-Type", "image/jpeg")
+	io.Copy(w, obj)
+}
+
+func extFromMime(mime string) string {
+	switch mime {
+	case "image/png":
+		return ".png"
+	case "image/gif":
+		return ".gif"
+	case "image/webp":
+		return ".webp"
+	default:
+		return ".jpg"
 	}
 }

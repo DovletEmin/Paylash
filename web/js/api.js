@@ -18,12 +18,6 @@ const API = {
     },
 
     auth: {
-        register(username, password, fullName, facultyId, courseId, groupId) {
-            return API._request('POST', '/api/auth/register', {
-                username, password, full_name: fullName,
-                faculty_id: facultyId, course_id: courseId, group_id: groupId
-            });
-        },
         login(username, password) {
             return API._request('POST', '/api/auth/login', { username, password });
         },
@@ -33,6 +27,12 @@ const API = {
             return API._request('PATCH', '/api/auth/profile', {
                 display_name: displayName, old_password: oldPassword, new_password: newPassword
             });
+        },
+        uploadAvatar(file) {
+            const form = new FormData();
+            form.append('avatar', file);
+            return fetch('/api/auth/avatar', { method: 'POST', body: form, credentials: 'same-origin' })
+                .then(r => r.json().then(d => r.ok ? d : Promise.reject(new Error(d.error || 'Ýalňyşlyk'))));
         },
     },
 
@@ -135,8 +135,8 @@ const API = {
             delete(id) { return API._request('DELETE', `/api/admin/courses/${id}`); },
         },
         groups: {
-            create(name, courseId) { return API._request('POST', '/api/admin/groups', { name, course_id: courseId }); },
-            update(id, name, courseId) { return API._request('PATCH', `/api/admin/groups/${id}`, { name }); },
+            create(name, courseId, quotaBytes) { return API._request('POST', '/api/admin/groups', { name, course_id: courseId, quota_bytes: quotaBytes || 5368709120 }); },
+            update(id, name, quotaBytes) { return API._request('PATCH', `/api/admin/groups/${id}`, { name, quota_bytes: quotaBytes }); },
             delete(id) { return API._request('DELETE', `/api/admin/groups/${id}`); },
             bulkQuota(quotaMB) { return API._request('POST', '/api/admin/groups/bulk-quota', { quota_mb: quotaMB }); },
         },
@@ -154,6 +154,12 @@ const API = {
             },
             delete(id) { return API._request('DELETE', `/api/admin/users/${id}`); },
             bulkQuota(quotaMB) { return API._request('POST', '/api/admin/users/bulk-quota', { quota_mb: quotaMB }); },
+            importFile(file) {
+                const form = new FormData();
+                form.append('file', file);
+                return fetch('/api/admin/users/import', { method: 'POST', body: form, credentials: 'same-origin' })
+                    .then(r => r.json().then(d => r.ok ? d : Promise.reject(new Error(d.error || 'Ýalňyşlyk'))));
+            },
         },
     },
 };
