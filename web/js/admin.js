@@ -3,6 +3,8 @@ const AdminPage = {
     currentTab: 'dashboard',
     _faculties: [],
     _users: [],
+    _adminGroupFiles: { groupId: null, folderId: null, files: [], folders: [], breadcrumbs: [] },
+    _adminPublicFiles: { folderId: null, files: [], folders: [], breadcrumbs: [] },
 
     render() {
         return `
@@ -15,6 +17,8 @@ const AdminPage = {
                     <a class="admin-nav-item ${this.currentTab === 'courses' ? 'active' : ''}" onclick="AdminPage.switchTab('courses')">${UI.icons.book} Ugurlar</a>
                     <a class="admin-nav-item ${this.currentTab === 'groups' ? 'active' : ''}" onclick="AdminPage.switchTab('groups')">${UI.icons.users} Toparlar</a>
                     <a class="admin-nav-item ${this.currentTab === 'users' ? 'active' : ''}" onclick="AdminPage.switchTab('users')">${UI.icons.user} Ulanyjylar</a>
+                    <a class="admin-nav-item ${this.currentTab === 'group-files' ? 'active' : ''}" onclick="AdminPage.switchTab('group-files')">📁 Topar faýllary</a>
+                    <a class="admin-nav-item ${this.currentTab === 'public-files' ? 'active' : ''}" onclick="AdminPage.switchTab('public-files')">🌐 Umumy faýllar</a>
                 </nav>
             </div>
             <div class="admin-content" id="admin-content"></div>
@@ -26,7 +30,7 @@ const AdminPage = {
     async switchTab(tab) {
         this.currentTab = tab;
         document.querySelectorAll('.admin-nav-item').forEach((el, i) => {
-            el.classList.toggle('active', ['dashboard','faculties','courses','groups','users'][i] === tab);
+            el.classList.toggle('active', ['dashboard','faculties','courses','groups','users','group-files','public-files'][i] === tab);
         });
         const c = document.getElementById('admin-content');
         if (!c) return;
@@ -37,6 +41,8 @@ const AdminPage = {
             case 'courses':   await this.renderCourses(c); break;
             case 'groups':    await this.renderGroups(c); break;
             case 'users':     await this.renderUsers(c); break;
+            case 'group-files': await this.renderGroupFiles(c); break;
+            case 'public-files': await this.renderPublicFiles(c); break;
         }
     },
 
@@ -343,5 +349,331 @@ const AdminPage = {
             if (result.created > 0) this.switchTab('users');
         } catch (e) { UI.toast(e.message, 'error'); }
         finally { btn.disabled = false; btn.textContent = 'Import et'; }
+    },
+
+    /* ── Group Files ── */
+    async renderGroupFiles(el) {
+        try {
+            const facs = (await API.admin.faculties.list()) || [];
+            const st = this._adminGroupFiles;
+            const fOpts = facs.map(f => `<option value="${f.id}">${UI.esc(f.name)}</option>`).join('');
+            el.innerHTML = `
+            <div class="admin-header"><h2>Topar faýllary</h2></div>
+            <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:end">
+                <div class="form-group" style="margin:0"><label style="font-size:.78rem">Fakultet</label><select id="gf-faculty" class="form-control" style="width:180px" onchange="AdminPage.onGfFacultyChange()"><option value="">Saýlaň…</option>${fOpts}</select></div>
+                <div class="form-group" style="margin:0"><label style="font-size:.78rem">Ugur</label><select id="gf-course" class="form-control" style="width:180px" disabled><option value="">Ilki fakultet saýlaň</option></select></div>
+                <div class="form-group" style="margin:0"><label style="font-size:.78rem">Topar</label><select id="gf-group" class="form-control" style="width:180px" disabled><option value="">Ilki ugur saýlaň</option></select></div>
+            </div>
+            <div id="gf-actions" style="display:none;margin-bottom:12px">
+                <button class="btn btn-primary btn-sm" onclick="document.getElementById('gf-file-input').click()">${UI.icons.upload} Faýl ýükle</button>
+                <button class="btn btn-ghost btn-sm" onclick="AdminPage.showGfNewFolder()">${UI.icons.plus} Täze papka</button>
+                <input type="file" id="gf-file-input" multiple style="display:none" onchange="AdminPage.gfUploadFiles(this.files)">
+            </div>
+            <div id="gf-breadcrumbs" class="breadcrumbs" style="margin-bottom:8px"></div>
+            <div id="gf-upload-progress" class="upload-progress hidden"></div>
+            <div id="gf-content"><p class="text-muted">Topary saýlaň</p></div>`;
+        } catch (e) { el.innerHTML = `<p class="text-muted">${UI.esc(e.message)}</p>`; }
+    },
+
+    async onGfFacultyChange() {
+        const fId = document.getElementById('gf-faculty').value;
+        const cEl = document.getElementById('gf-course'), gEl = document.getElementById('gf-group');
+        cEl.innerHTML = '<option value="">Ugur saýlaň…</option>'; cEl.disabled = true;
+        gEl.innerHTML = '<option value="">Ilki ugur saýlaň</option>'; gEl.disabled = true;
+        document.getElementById('gf-actions').style.display = 'none';
+        document.getElementById('gf-content').innerHTML = '<p class="text-muted">Topary saýlaň</p>';
+        if (!fId) return;
+        try {
+            const cs = (await API.catalogs.courses(fId)) || [];
+            cEl.disabled = false;
+            cs.forEach(c => { const o = document.createElement('option'); o.value = c.id; o.textContent = c.name; cEl.appendChild(o); });
+        } catch {}
+        cEl.onchange = () => this.onGfCourseChange();
+    },
+
+    async onGfCourseChange() {
+        const cId = document.getElementById('gf-course').value;
+        const gEl = document.getElementById('gf-group');
+        gEl.innerHTML = '<option value="">Topar saýlaň…</option>'; gEl.disabled = true;
+        document.getElementById('gf-actions').style.display = 'none';
+        document.getElementById('gf-content').innerHTML = '<p class="text-muted">Topary saýlaň</p>';
+        if (!cId) return;
+        try {
+            const gs = (await API.catalogs.groups(cId)) || [];
+            gEl.disabled = false;
+            gs.forEach(g => { const o = document.createElement('option'); o.value = g.id; o.textContent = g.name; gEl.appendChild(o); });
+        } catch {}
+        gEl.onchange = () => this.onGfGroupChange();
+    },
+
+    async onGfGroupChange() {
+        const gId = parseInt(document.getElementById('gf-group').value);
+        if (!gId) {
+            document.getElementById('gf-actions').style.display = 'none';
+            document.getElementById('gf-content').innerHTML = '<p class="text-muted">Topary saýlaň</p>';
+            return;
+        }
+        this._adminGroupFiles.groupId = gId;
+        this._adminGroupFiles.folderId = null;
+        document.getElementById('gf-actions').style.display = '';
+        await this.loadGfFiles();
+    },
+
+    async loadGfFiles() {
+        const st = this._adminGroupFiles;
+        const c = document.getElementById('gf-content');
+        if (!c || !st.groupId) return;
+        c.innerHTML = UI.skeletonCards(4);
+        try {
+            let url = `/api/files?scope=group&group_id=${st.groupId}`;
+            if (st.folderId) url += `&folder_id=${st.folderId}`;
+            const data = await API._request('GET', url);
+            st.files = data.files || [];
+            st.folders = data.folders || [];
+            st.breadcrumbs = data.breadcrumbs || [];
+            this.renderGfBreadcrumbs();
+            this.renderGfFileList(c);
+        } catch (e) { c.innerHTML = `<p class="text-muted">${UI.esc(e.message)}</p>`; }
+    },
+
+    renderGfBreadcrumbs() {
+        const el = document.getElementById('gf-breadcrumbs');
+        if (!el) return;
+        let h = `<a class="breadcrumb-item" onclick="AdminPage._adminGroupFiles.folderId=null;AdminPage.loadGfFiles()">Topar</a>`;
+        for (const b of this._adminGroupFiles.breadcrumbs) {
+            h += `<span class="breadcrumb-sep">/</span><a class="breadcrumb-item" onclick="AdminPage._adminGroupFiles.folderId=${b.id};AdminPage.loadGfFiles()">${UI.esc(b.name)}</a>`;
+        }
+        el.innerHTML = h;
+    },
+
+    renderGfFileList(c) {
+        const st = this._adminGroupFiles;
+        const items = [...st.folders.map(f => ({ ...f, isFolder: true })), ...st.files];
+        if (!items.length) { c.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📂</div><p>Bu ýerde faýl ýok</p></div>'; return; }
+        c.innerHTML = '<div class="file-grid">' + items.map(i => {
+            const icon = UI.fileIcon(i.name, i.isFolder);
+            const cls = UI.fileIconClass(i.name, i.isFolder);
+            let dbl = i.isFolder ? `AdminPage._adminGroupFiles.folderId=${i.id};AdminPage.loadGfFiles()` : `FilesPage.download(${i.id},'${UI.esc(i.name)}')`;
+            if (!i.isFolder && UI.isMediaPreviewable(i.name)) dbl = `PreviewPage.open(${i.id},'${UI.esc(i.name)}')`;
+            else if (!i.isFolder && UI.isCollaboraViewable(i.name)) dbl = `EditorPage.open(${i.id},'${UI.esc(i.name)}')`;
+            return `<div class="file-card" ondblclick="${dbl}" oncontextmenu="AdminPage.showGfMenu(event,${JSON.stringify(i).replace(/"/g,'&quot;')})">
+                <div class="file-card-icon ${cls}">${icon}</div>
+                <div class="file-card-name" title="${UI.esc(i.name)}">${UI.esc(i.name)}</div>
+                ${!i.isFolder ? `<div class="file-card-meta">${UI.formatBytes(i.size_bytes||0)}</div>` : '<div class="file-card-meta">Papka</div>'}
+            </div>`;
+        }).join('') + '</div>';
+    },
+
+    showGfMenu(e, item) {
+        e.preventDefault(); e.stopPropagation();
+        const items = [];
+        if (item.isFolder) {
+            items.push({ action: 'open', label: 'Aç', icon: '📂', handler: () => { this._adminGroupFiles.folderId = item.id; this.loadGfFiles(); } });
+            items.push({ action: 'rename', label: 'Adyny üýtget', icon: '✏️', handler: () => this.gfRenameFolder(item) });
+            items.push({ divider: true });
+            items.push({ action: 'delete', label: 'Poz', icon: '🗑', danger: true, handler: () => this.gfDeleteFolder(item) });
+        } else {
+            items.push({ action: 'download', label: 'Ýükle', icon: '📥', handler: () => FilesPage.download(item.id, item.name) });
+            items.push({ action: 'rename', label: 'Adyny üýtget', icon: '✏️', handler: () => this.gfRenameFile(item) });
+            items.push({ divider: true });
+            items.push({ action: 'delete', label: 'Poz', icon: '🗑', danger: true, handler: () => this.gfDeleteFile(item) });
+        }
+        UI.showContextMenu(e.clientX, e.clientY, items);
+    },
+
+    async gfUploadFiles(fileList) {
+        if (!fileList.length || !this._adminGroupFiles.groupId) return;
+        const prog = document.getElementById('gf-upload-progress');
+        prog.classList.remove('hidden');
+        for (const file of fileList) {
+            const id = 'gfu-' + Math.random().toString(36).substr(2, 6);
+            prog.innerHTML += `<div class="upload-item" id="${id}"><div class="upload-item-name">${UI.esc(file.name)}</div><div class="upload-item-bar"><div class="upload-item-fill" id="${id}-f"></div></div><div class="upload-item-pct" id="${id}-p">0%</div></div>`;
+            try {
+                const form = new FormData();
+                form.append('file', file);
+                form.append('scope', 'group');
+                form.append('group_id', String(this._adminGroupFiles.groupId));
+                if (this._adminGroupFiles.folderId) form.append('folder_id', String(this._adminGroupFiles.folderId));
+                await new Promise((resolve, reject) => {
+                    const xhr = new XMLHttpRequest();
+                    xhr.open('POST', '/api/files/upload');
+                    xhr.withCredentials = true;
+                    xhr.upload.onprogress = (ev) => { if (ev.lengthComputable) { const pct = Math.round(ev.loaded / ev.total * 100); const f = document.getElementById(id+'-f'), p = document.getElementById(id+'-p'); if (f) f.style.width = pct+'%'; if (p) p.textContent = pct+'%'; } };
+                    xhr.onload = () => { if (xhr.status >= 200 && xhr.status < 300) resolve(); else { try { reject(new Error(JSON.parse(xhr.responseText).error)); } catch { reject(new Error('Ýükläp bolmady')); } } };
+                    xhr.onerror = () => reject(new Error('Tor näsazlygy'));
+                    xhr.send(form);
+                });
+                document.getElementById(id)?.classList.add('upload-done');
+            } catch (err) {
+                UI.toast(`"${file.name}": ${err.message}`, 'error');
+                document.getElementById(id)?.classList.add('upload-error');
+            }
+        }
+        setTimeout(() => { prog.innerHTML = ''; prog.classList.add('hidden'); }, 2000);
+        this.loadGfFiles();
+        document.getElementById('gf-file-input').value = '';
+    },
+
+    showGfNewFolder() {
+        UI.showModal('Täze papka', `<div class="form-group"><label>Papkanyň ady</label><input type="text" id="gf-folder-name" class="form-control" placeholder="Papka ady"></div>`,
+            `<button class="btn btn-ghost" onclick="UI.closeModal()">Ýatyrmak</button><button class="btn btn-primary" onclick="AdminPage.doGfCreateFolder()">Döret</button>`);
+    },
+    async doGfCreateFolder() {
+        const n = document.getElementById('gf-folder-name').value.trim(); if (!n) return;
+        try { await API.folders.create(n, 'group', this._adminGroupFiles.folderId, this._adminGroupFiles.groupId); UI.closeModal(); UI.toast('Papka döredildi', 'success'); this.loadGfFiles(); } catch (e) { UI.toast(e.message, 'error'); }
+    },
+    gfRenameFile(item) {
+        UI.showModal('Adyny üýtget', `<div class="form-group"><label>Täze ady</label><input type="text" id="gf-rename" value="${UI.esc(item.name)}" class="form-control"></div>`,
+            `<button class="btn btn-ghost" onclick="UI.closeModal()">Ýatyrmak</button><button class="btn btn-primary" onclick="AdminPage.doGfRenameFile(${item.id})">Üýtget</button>`);
+    },
+    async doGfRenameFile(id) { const n = document.getElementById('gf-rename').value.trim(); if (!n) return; try { await API.files.rename(id, n); UI.closeModal(); UI.toast('Üýtgedildi', 'success'); this.loadGfFiles(); } catch (e) { UI.toast(e.message, 'error'); } },
+    gfRenameFolder(item) {
+        UI.showModal('Papkanyň adyny üýtget', `<div class="form-group"><label>Täze ady</label><input type="text" id="gf-rename" value="${UI.esc(item.name)}" class="form-control"></div>`,
+            `<button class="btn btn-ghost" onclick="UI.closeModal()">Ýatyrmak</button><button class="btn btn-primary" onclick="AdminPage.doGfRenameFolder(${item.id})">Üýtget</button>`);
+    },
+    async doGfRenameFolder(id) { const n = document.getElementById('gf-rename').value.trim(); if (!n) return; try { await API.folders.rename(id, n); UI.closeModal(); UI.toast('Üýtgedildi', 'success'); this.loadGfFiles(); } catch (e) { UI.toast(e.message, 'error'); } },
+    async gfDeleteFile(item) {
+        if (!confirm(`"${item.name}" faýlyny pozmak isleýärsiňizmi?`)) return;
+        try { await API.files.delete(item.id); UI.toast('Pozuldy', 'success'); this.loadGfFiles(); } catch (e) { UI.toast(e.message, 'error'); }
+    },
+    async gfDeleteFolder(item) {
+        if (!confirm(`"${item.name}" papkasyny pozmak isleýärsiňizmi?`)) return;
+        try { await API.folders.delete(item.id); UI.toast('Pozuldy', 'success'); this.loadGfFiles(); } catch (e) { UI.toast(e.message, 'error'); }
+    },
+
+    /* ── Public Files ── */
+    async renderPublicFiles(el) {
+        el.innerHTML = `
+        <div class="admin-header"><h2>Umumy faýllar</h2></div>
+        <div style="margin-bottom:12px">
+            <button class="btn btn-primary btn-sm" onclick="document.getElementById('pf-file-input').click()">${UI.icons.upload} Faýl ýükle</button>
+            <button class="btn btn-ghost btn-sm" onclick="AdminPage.showPfNewFolder()">${UI.icons.plus} Täze papka</button>
+            <input type="file" id="pf-file-input" multiple style="display:none" onchange="AdminPage.pfUploadFiles(this.files)">
+        </div>
+        <div id="pf-breadcrumbs" class="breadcrumbs" style="margin-bottom:8px"></div>
+        <div id="pf-upload-progress" class="upload-progress hidden"></div>
+        <div id="pf-content">${UI.skeletonCards(4)}</div>`;
+        await this.loadPfFiles();
+    },
+
+    async loadPfFiles() {
+        const st = this._adminPublicFiles;
+        const c = document.getElementById('pf-content');
+        if (!c) return;
+        c.innerHTML = UI.skeletonCards(4);
+        try {
+            let url = `/api/files?scope=public`;
+            if (st.folderId) url += `&folder_id=${st.folderId}`;
+            const data = await API._request('GET', url);
+            st.files = data.files || [];
+            st.folders = data.folders || [];
+            st.breadcrumbs = data.breadcrumbs || [];
+            this.renderPfBreadcrumbs();
+            this.renderPfFileList(c);
+        } catch (e) { c.innerHTML = `<p class="text-muted">${UI.esc(e.message)}</p>`; }
+    },
+
+    renderPfBreadcrumbs() {
+        const el = document.getElementById('pf-breadcrumbs');
+        if (!el) return;
+        let h = `<a class="breadcrumb-item" onclick="AdminPage._adminPublicFiles.folderId=null;AdminPage.loadPfFiles()">Umumy</a>`;
+        for (const b of this._adminPublicFiles.breadcrumbs) {
+            h += `<span class="breadcrumb-sep">/</span><a class="breadcrumb-item" onclick="AdminPage._adminPublicFiles.folderId=${b.id};AdminPage.loadPfFiles()">${UI.esc(b.name)}</a>`;
+        }
+        el.innerHTML = h;
+    },
+
+    renderPfFileList(c) {
+        const st = this._adminPublicFiles;
+        const items = [...st.folders.map(f => ({ ...f, isFolder: true })), ...st.files];
+        if (!items.length) { c.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📂</div><p>Bu ýerde faýl ýok</p></div>'; return; }
+        c.innerHTML = '<div class="file-grid">' + items.map(i => {
+            const icon = UI.fileIcon(i.name, i.isFolder);
+            const cls = UI.fileIconClass(i.name, i.isFolder);
+            let dbl = i.isFolder ? `AdminPage._adminPublicFiles.folderId=${i.id};AdminPage.loadPfFiles()` : `FilesPage.download(${i.id},'${UI.esc(i.name)}')`;
+            if (!i.isFolder && UI.isMediaPreviewable(i.name)) dbl = `PreviewPage.open(${i.id},'${UI.esc(i.name)}')`;
+            else if (!i.isFolder && UI.isCollaboraViewable(i.name)) dbl = `EditorPage.open(${i.id},'${UI.esc(i.name)}')`;
+            return `<div class="file-card" ondblclick="${dbl}" oncontextmenu="AdminPage.showPfMenu(event,${JSON.stringify(i).replace(/"/g,'&quot;')})">
+                <div class="file-card-icon ${cls}">${icon}</div>
+                <div class="file-card-name" title="${UI.esc(i.name)}">${UI.esc(i.name)}</div>
+                ${!i.isFolder ? `<div class="file-card-meta">${UI.formatBytes(i.size_bytes||0)}</div>` : '<div class="file-card-meta">Papka</div>'}
+            </div>`;
+        }).join('') + '</div>';
+    },
+
+    showPfMenu(e, item) {
+        e.preventDefault(); e.stopPropagation();
+        const items = [];
+        if (item.isFolder) {
+            items.push({ action: 'open', label: 'Aç', icon: '📂', handler: () => { this._adminPublicFiles.folderId = item.id; this.loadPfFiles(); } });
+            items.push({ action: 'rename', label: 'Adyny üýtget', icon: '✏️', handler: () => this.pfRenameFolder(item) });
+            items.push({ divider: true });
+            items.push({ action: 'delete', label: 'Poz', icon: '🗑', danger: true, handler: () => this.pfDeleteFolder(item) });
+        } else {
+            items.push({ action: 'download', label: 'Ýükle', icon: '📥', handler: () => FilesPage.download(item.id, item.name) });
+            items.push({ action: 'rename', label: 'Adyny üýtget', icon: '✏️', handler: () => this.pfRenameFile(item) });
+            items.push({ divider: true });
+            items.push({ action: 'delete', label: 'Poz', icon: '🗑', danger: true, handler: () => this.pfDeleteFile(item) });
+        }
+        UI.showContextMenu(e.clientX, e.clientY, items);
+    },
+
+    async pfUploadFiles(fileList) {
+        if (!fileList.length) return;
+        const prog = document.getElementById('pf-upload-progress');
+        prog.classList.remove('hidden');
+        for (const file of fileList) {
+            const id = 'pfu-' + Math.random().toString(36).substr(2, 6);
+            prog.innerHTML += `<div class="upload-item" id="${id}"><div class="upload-item-name">${UI.esc(file.name)}</div><div class="upload-item-bar"><div class="upload-item-fill" id="${id}-f"></div></div><div class="upload-item-pct" id="${id}-p">0%</div></div>`;
+            try {
+                const form = new FormData();
+                form.append('file', file);
+                form.append('scope', 'public');
+                if (this._adminPublicFiles.folderId) form.append('folder_id', String(this._adminPublicFiles.folderId));
+                await new Promise((resolve, reject) => {
+                    const xhr = new XMLHttpRequest();
+                    xhr.open('POST', '/api/files/upload');
+                    xhr.withCredentials = true;
+                    xhr.upload.onprogress = (ev) => { if (ev.lengthComputable) { const pct = Math.round(ev.loaded / ev.total * 100); const f = document.getElementById(id+'-f'), p = document.getElementById(id+'-p'); if (f) f.style.width = pct+'%'; if (p) p.textContent = pct+'%'; } };
+                    xhr.onload = () => { if (xhr.status >= 200 && xhr.status < 300) resolve(); else { try { reject(new Error(JSON.parse(xhr.responseText).error)); } catch { reject(new Error('Ýükläp bolmady')); } } };
+                    xhr.onerror = () => reject(new Error('Tor näsazlygy'));
+                    xhr.send(form);
+                });
+                document.getElementById(id)?.classList.add('upload-done');
+            } catch (err) {
+                UI.toast(`"${file.name}": ${err.message}`, 'error');
+                document.getElementById(id)?.classList.add('upload-error');
+            }
+        }
+        setTimeout(() => { prog.innerHTML = ''; prog.classList.add('hidden'); }, 2000);
+        this.loadPfFiles();
+        document.getElementById('pf-file-input').value = '';
+    },
+
+    showPfNewFolder() {
+        UI.showModal('Täze papka', `<div class="form-group"><label>Papkanyň ady</label><input type="text" id="pf-folder-name" class="form-control" placeholder="Papka ady"></div>`,
+            `<button class="btn btn-ghost" onclick="UI.closeModal()">Ýatyrmak</button><button class="btn btn-primary" onclick="AdminPage.doPfCreateFolder()">Döret</button>`);
+    },
+    async doPfCreateFolder() {
+        const n = document.getElementById('pf-folder-name').value.trim(); if (!n) return;
+        try { await API.folders.create(n, 'public', this._adminPublicFiles.folderId); UI.closeModal(); UI.toast('Papka döredildi', 'success'); this.loadPfFiles(); } catch (e) { UI.toast(e.message, 'error'); }
+    },
+    pfRenameFile(item) {
+        UI.showModal('Adyny üýtget', `<div class="form-group"><label>Täze ady</label><input type="text" id="pf-rename" value="${UI.esc(item.name)}" class="form-control"></div>`,
+            `<button class="btn btn-ghost" onclick="UI.closeModal()">Ýatyrmak</button><button class="btn btn-primary" onclick="AdminPage.doPfRenameFile(${item.id})">Üýtget</button>`);
+    },
+    async doPfRenameFile(id) { const n = document.getElementById('pf-rename').value.trim(); if (!n) return; try { await API.files.rename(id, n); UI.closeModal(); UI.toast('Üýtgedildi', 'success'); this.loadPfFiles(); } catch (e) { UI.toast(e.message, 'error'); } },
+    pfRenameFolder(item) {
+        UI.showModal('Papkanyň adyny üýtget', `<div class="form-group"><label>Täze ady</label><input type="text" id="pf-rename" value="${UI.esc(item.name)}" class="form-control"></div>`,
+            `<button class="btn btn-ghost" onclick="UI.closeModal()">Ýatyrmak</button><button class="btn btn-primary" onclick="AdminPage.doPfRenameFolder(${item.id})">Üýtget</button>`);
+    },
+    async doPfRenameFolder(id) { const n = document.getElementById('pf-rename').value.trim(); if (!n) return; try { await API.folders.rename(id, n); UI.closeModal(); UI.toast('Üýtgedildi', 'success'); this.loadPfFiles(); } catch (e) { UI.toast(e.message, 'error'); } },
+    async pfDeleteFile(item) {
+        if (!confirm(`"${item.name}" faýlyny pozmak isleýärsiňizmi?`)) return;
+        try { await API.files.delete(item.id); UI.toast('Pozuldy', 'success'); this.loadPfFiles(); } catch (e) { UI.toast(e.message, 'error'); }
+    },
+    async pfDeleteFolder(item) {
+        if (!confirm(`"${item.name}" papkasyny pozmak isleýärsiňizmi?`)) return;
+        try { await API.folders.delete(item.id); UI.toast('Pozuldy', 'success'); this.loadPfFiles(); } catch (e) { UI.toast(e.message, 'error'); }
     }
 };

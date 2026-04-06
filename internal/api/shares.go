@@ -182,6 +182,11 @@ func (h *Handler) SetVisibility(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "visibility 'private', 'group' ýa-da 'public' bolmaly")
 		return
 	}
+	// Only admin can set group/public visibility
+	if (req.Visibility == "group" || req.Visibility == "public") && user.Role != "admin" {
+		writeError(w, http.StatusForbidden, "diňe admin görnüşi üýtgedip biler")
+		return
+	}
 	if err := h.db.SetFileVisibility(fileID, req.Visibility); err != nil {
 		writeError(w, http.StatusInternalServerError, "üýtgedip bolmady")
 		return

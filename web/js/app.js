@@ -65,7 +65,7 @@ const App = {
         <div class="app-layout">
             <aside class="sidebar" id="sidebar">
                 <div class="sidebar-header">
-                    <div class="sidebar-logo">${UI.icons.cloud} Paylash</div>
+                    <div class="sidebar-logo">${UI.icons.cloud} Paýlaş</div>
                 </div>
                 <nav class="sidebar-nav">
                     <div class="sidebar-section">Esasy</div>

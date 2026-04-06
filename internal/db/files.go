@@ -38,7 +38,7 @@ func (d *DB) ListFiles(ownerID int, groupID *int, scope string, folderID *int, s
 	var n int
 
 	if scope == "public" {
-		q = `SELECT id, name, mime_type, size_bytes, minio_bucket, minio_key, folder_id, owner_id, group_id, scope, visibility, version, created_at, updated_at FROM files WHERE visibility = 'public'`
+		q = `SELECT id, name, mime_type, size_bytes, minio_bucket, minio_key, folder_id, owner_id, group_id, scope, visibility, version, created_at, updated_at FROM files WHERE (visibility = 'public' OR scope = 'public')`
 		n = 0
 	} else if scope == "group" && groupID != nil {
 		q = `SELECT id, name, mime_type, size_bytes, minio_bucket, minio_key, folder_id, owner_id, group_id, scope, visibility, version, created_at, updated_at FROM files WHERE ((scope = 'group' AND group_id = $1) OR (visibility = 'group' AND owner_id IN (SELECT id FROM users WHERE group_id = $1)))`
@@ -193,13 +193,13 @@ func (d *DB) ListFolders(ownerID int, groupID *int, scope string, parentID *int)
 	var n int
 
 	if scope == "public" {
-		// Public scope: no folders (public files are shown flat)
-		return []models.Folder{}, nil
+		q = `SELECT id, name, parent_id, owner_id, group_id, scope, created_at FROM folders WHERE scope = 'public'`
+		n = 0
+	} else {
+		q = `SELECT id, name, parent_id, owner_id, group_id, scope, created_at FROM folders WHERE scope = $1`
+		args = []any{scope}
+		n = 1
 	}
-
-	q = `SELECT id, name, parent_id, owner_id, group_id, scope, created_at FROM folders WHERE scope = $1`
-	args = []any{scope}
-	n = 1
 
 	if scope == "personal" {
 		n++

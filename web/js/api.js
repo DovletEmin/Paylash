@@ -85,10 +85,10 @@ const API = {
     },
 
     folders: {
-        create(name, scope, parentId) {
-            return API._request('POST', '/api/folders', {
-                name, scope: scope || 'personal', parent_id: parentId || null
-            });
+        create(name, scope, parentId, groupId) {
+            const body = { name, scope: scope || 'personal', parent_id: parentId || null };
+            if (groupId) body.group_id = groupId;
+            return API._request('POST', '/api/folders', body);
         },
         rename(id, name) { return API._request('PATCH', `/api/folders/${id}`, { name }); },
         delete(id) { return API._request('DELETE', `/api/folders/${id}`); },

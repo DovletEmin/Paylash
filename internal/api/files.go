@@ -29,12 +29,22 @@ func (h *Handler) ListFiles(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	files, err := h.db.ListFiles(user.ID, user.GroupID, scope, folderID, sort, order)
+	// Admin can list files for any group via group_id param
+	groupID := user.GroupID
+	if user.Role == "admin" {
+		if gid := r.URL.Query().Get("group_id"); gid != "" {
+			if n, err := strconv.Atoi(gid); err == nil {
+				groupID = &n
+			}
+		}
+	}
+
+	files, err := h.db.ListFiles(user.ID, groupID, scope, folderID, sort, order)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "faýllary alyp bolmady")
 		return
 	}
-	folders, err := h.db.ListFolders(user.ID, user.GroupID, scope, folderID)
+	folders, err := h.db.ListFolders(user.ID, groupID, scope, folderID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "bukjalary alyp bolmady")
 		return
@@ -68,12 +78,26 @@ func (h *Handler) UploadFile(w http.ResponseWriter, r *http.Request) {
 		scope = "personal"
 	}
 
+	// Only admin can upload to group/public scopes
+	if (scope == "group" || scope == "public") && user.Role != "admin" {
+		writeError(w, http.StatusForbidden, "diňe admin topar/umumy faýl ýükläp biler")
+		return
+	}
+
 	// Determine bucket and check quota
 	var bucket string
 	var groupID *int
-	if scope == "group" && user.GroupID != nil {
-		groupID = user.GroupID
-		bucket = storage.GroupBucket(*user.GroupID)
+	if scope == "group" {
+		gidStr := r.FormValue("group_id")
+		gid, err := strconv.Atoi(gidStr)
+		if err != nil || gid <= 0 {
+			writeError(w, http.StatusBadRequest, "topar saýlanmaly")
+			return
+		}
+		groupID = &gid
+		bucket = storage.GroupBucket(gid)
+	} else if scope == "public" {
+		bucket = "public-files"
 	} else {
 		scope = "personal"
 		bucket = storage.PersonalBucket(user.ID)
@@ -128,6 +152,11 @@ func (h *Handler) UploadFile(w http.ResponseWriter, r *http.Request) {
 		OwnerID:     user.ID,
 		GroupID:     groupID,
 		Scope:       scope,
+	}
+	if scope == "group" {
+		f.Visibility = "group"
+	} else if scope == "public" {
+		f.Visibility = "public"
 	}
 	if err := h.db.CreateFile(f); err != nil {
 		writeError(w, http.StatusInternalServerError, "faýl maglumatyny saklap bolmady")
@@ -291,13 +320,21 @@ func (h *Handler) CreateFolder(w http.ResponseWriter, r *http.Request) {
 		scope = "personal"
 	}
 
+	// Only admin can create folders in group/public scopes
+	if (scope == "group" || scope == "public") && user.Role != "admin" {
+		writeError(w, http.StatusForbidden, "diňe admin topar/umumy papka döredip biler")
+		return
+	}
+
 	folder := &models.Folder{
 		Name:     strings.TrimSpace(req.Name),
 		ParentID: req.ParentID,
 		OwnerID:  user.ID,
 		Scope:    scope,
 	}
-	if scope == "group" && user.GroupID != nil {
+	if scope == "group" && req.GroupID != nil {
+		folder.GroupID = req.GroupID
+	} else if scope == "group" && user.GroupID != nil {
 		folder.GroupID = user.GroupID
 	}
 

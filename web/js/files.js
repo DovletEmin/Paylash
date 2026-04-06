@@ -8,6 +8,8 @@ const FilesPage = {
     folders: [],
 
     render() {
+        const isAdmin = App.user && App.user.role === 'admin';
+        const canUpload = this.currentScope === 'personal' || isAdmin;
         return `
         <div class="files-page">
             <div class="files-toolbar">
@@ -22,10 +24,10 @@ const FilesPage = {
                     <button class="btn btn-icon btn-ghost ${this.viewMode === 'list' ? 'active' : ''}" onclick="FilesPage.setView('list')" title="Sanaw">${UI.icons.list}</button>
                 </div>
             </div>
-            <div class="files-actions">
+            ${canUpload ? `<div class="files-actions">
                 <button class="btn btn-primary btn-sm" onclick="FilesPage.showUploadModal()">${UI.icons.upload} Ýükle</button>
                 <button class="btn btn-ghost btn-sm" onclick="FilesPage.showNewFolderModal()">${UI.icons.plus} Täze papka</button>
-            </div>
+            </div>` : ''}
             <div class="breadcrumbs" id="breadcrumbs"></div>
             <input type="file" id="file-input" multiple style="display:none" onchange="FilesPage.handleFileSelect(this.files)">
             <div id="upload-progress" class="upload-progress hidden"></div>
@@ -120,21 +122,27 @@ const FilesPage = {
 
     showMenu(e, item) {
         e.preventDefault(); e.stopPropagation();
+        const isAdmin = App.user && App.user.role === 'admin';
+        const canManage = this.currentScope === 'personal' || isAdmin;
         const items = [];
         if (item.isFolder) {
             items.push({ action: 'open', label: 'Aç', icon: '📂', handler: () => this.goToFolder(item.id) });
-            items.push({ action: 'rename', label: 'Adyny üýtget', icon: '✏️', handler: () => this.renameFolder(item) });
-            items.push({ divider: true });
-            items.push({ action: 'delete', label: 'Poz', icon: '🗑', danger: true, handler: () => this.deleteFolder(item) });
+            if (canManage) {
+                items.push({ action: 'rename', label: 'Adyny üýtget', icon: '✏️', handler: () => this.renameFolder(item) });
+                items.push({ divider: true });
+                items.push({ action: 'delete', label: 'Poz', icon: '🗑', danger: true, handler: () => this.deleteFolder(item) });
+            }
         } else {
             if (UI.isMediaPreviewable(item.name)) items.push({ action: 'preview', label: 'Görmek', icon: '👁', handler: () => PreviewPage.open(item.id, item.name) });
             else if (UI.isCollaboraEditable(item.name)) items.push({ action: 'edit', label: 'Redaktirle', icon: '📝', handler: () => EditorPage.open(item.id, item.name) });
             else if (UI.isCollaboraViewable(item.name)) items.push({ action: 'view', label: 'Açmak', icon: '👁', handler: () => EditorPage.open(item.id, item.name) });
             items.push({ action: 'download', label: 'Ýükle', icon: '📥', handler: () => this.download(item.id, item.name) });
-            items.push({ action: 'share', label: 'Paýlaş', icon: '🔗', handler: () => SharesPage.showShareModal(item) });
-            items.push({ action: 'rename', label: 'Adyny üýtget', icon: '✏️', handler: () => this.renameFile(item) });
-            items.push({ divider: true });
-            items.push({ action: 'delete', label: 'Poz', icon: '🗑', danger: true, handler: () => this.deleteFile(item) });
+            if (canManage) {
+                items.push({ action: 'share', label: 'Paýlaş', icon: '🔗', handler: () => SharesPage.showShareModal(item) });
+                items.push({ action: 'rename', label: 'Adyny üýtget', icon: '✏️', handler: () => this.renameFile(item) });
+                items.push({ divider: true });
+                items.push({ action: 'delete', label: 'Poz', icon: '🗑', danger: true, handler: () => this.deleteFile(item) });
+            }
         }
         UI.showContextMenu(e.clientX, e.clientY, items);
     },
@@ -175,6 +183,8 @@ const FilesPage = {
 
     initDragDrop() {
         if (this._dragInited) return;
+        const isAdmin = App.user && App.user.role === 'admin';
+        if (this.currentScope !== 'personal' && !isAdmin) return;
         const pg = document.querySelector('.files-page');
         const ov = document.getElementById('drop-overlay');
         if (!pg || !ov) return;

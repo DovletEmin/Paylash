@@ -35,7 +35,24 @@ const SharesPage = {
     },
 
     showShareModal(file) {
+        const isAdmin = App.user && App.user.role === 'admin';
         const vis = file.visibility || 'private';
+        let visibilityHTML = '';
+        if (isAdmin) {
+            visibilityHTML = `
+            <hr style="border:none;border-top:1px solid var(--border);margin:14px 0">
+            <div class="form-group">
+                <label>Görnüşi</label>
+                <div class="visibility-buttons" id="vis-buttons">
+                    <button class="btn btn-sm vis-btn ${vis === 'private' ? 'active' : ''}" data-vis="private" onclick="SharesPage.selectVisibility('private')">🔒 Şahsy</button>
+                    <button class="btn btn-sm vis-btn ${vis === 'group' ? 'active' : ''}" data-vis="group" onclick="SharesPage.selectVisibility('group')">👥 Topar</button>
+                    <button class="btn btn-sm vis-btn ${vis === 'public' ? 'active' : ''}" data-vis="public" onclick="SharesPage.selectVisibility('public')">🌐 Umumy</button>
+                </div>
+                <div id="vis-status" class="vis-status" style="font-size:.78rem;color:var(--text-3);margin-top:6px">
+                    ${vis === 'public' ? 'Ähli ulanyjylar görüp biler' : vis === 'group' ? 'Topardaşlaryňyz görüp biler' : 'Diňe siz we paýlaşylanlar'}
+                </div>
+            </div>`;
+        }
         UI.showModal(`"${UI.esc(file.name)}" paýlaş`, `
             <div class="form-group">
                 <label>Ulanyjy gözle</label>
@@ -50,18 +67,7 @@ const SharesPage = {
                     <option value="edit">✏️ Redaktirlemek</option>
                 </select>
             </div>
-            <hr style="border:none;border-top:1px solid var(--border);margin:14px 0">
-            <div class="form-group">
-                <label>Görnüşi</label>
-                <div class="visibility-buttons" id="vis-buttons">
-                    <button class="btn btn-sm vis-btn ${vis === 'private' ? 'active' : ''}" data-vis="private" onclick="SharesPage.selectVisibility('private')">🔒 Şahsy</button>
-                    <button class="btn btn-sm vis-btn ${vis === 'group' ? 'active' : ''}" data-vis="group" onclick="SharesPage.selectVisibility('group')">👥 Topar</button>
-                    <button class="btn btn-sm vis-btn ${vis === 'public' ? 'active' : ''}" data-vis="public" onclick="SharesPage.selectVisibility('public')">🌐 Umumy</button>
-                </div>
-                <div id="vis-status" class="vis-status" style="font-size:.78rem;color:var(--text-3);margin-top:6px">
-                    ${vis === 'public' ? 'Ähli ulanyjylar görüp biler' : vis === 'group' ? 'Topardaşlaryňyz görüp biler' : 'Diňe siz we paýlaşylanlar'}
-                </div>
-            </div>
+            ${visibilityHTML}
             <div id="share-existing"><p class="text-muted">Ýüklenýär…</p></div>`,
             `<button class="btn btn-ghost" onclick="UI.closeModal()">Ýatyr</button><button class="btn btn-primary" onclick="SharesPage.saveShare()">Ýatda sakla</button>`);
         this._currentFile = file;

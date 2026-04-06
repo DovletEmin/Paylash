@@ -124,6 +124,7 @@ type CreateFolderRequest struct {
 	Name     string `json:"name"`
 	ParentID *int   `json:"parent_id"`
 	Scope    string `json:"scope"`
+	GroupID  *int   `json:"group_id"`
 }
 
 type RenameRequest struct {
