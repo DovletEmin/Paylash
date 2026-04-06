@@ -38,7 +38,7 @@ const FilesPage = {
 
     async init() { await this.loadFiles(); this.initDragDrop(); },
 
-
+    _dragInited: false,
     async loadFiles() {
         const c = document.getElementById('files-content');
         if (!c) return;
@@ -139,7 +139,7 @@ const FilesPage = {
         UI.showContextMenu(e.clientX, e.clientY, items);
     },
 
-    setScope(s) { this.currentScope = s; this.currentFolder = null; App.renderPage('files'); },
+    setScope(s) { this.currentScope = s; this.currentFolder = null; this._dragInited = false; App.renderPage('files'); },
     setView(m) { this.viewMode = m; this.renderFiles(); },
     goToFolder(id) { this.currentFolder = id; this.loadFiles(); },
 
@@ -174,9 +174,11 @@ const FilesPage = {
     },
 
     initDragDrop() {
+        if (this._dragInited) return;
         const pg = document.querySelector('.files-page');
         const ov = document.getElementById('drop-overlay');
         if (!pg || !ov) return;
+        this._dragInited = true;
         let dragCounter = 0;
         pg.addEventListener('dragenter', ev => { ev.preventDefault(); dragCounter++; ov.classList.remove('hidden'); });
         pg.addEventListener('dragover', ev => { ev.preventDefault(); });
