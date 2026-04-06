@@ -15,6 +15,7 @@ const FilesPage = {
                     <div class="scope-toggle">
                         <button class="btn btn-sm ${this.currentScope === 'personal' ? 'active' : ''}" onclick="FilesPage.setScope('personal')">Şahsy</button>
                         <button class="btn btn-sm ${this.currentScope === 'group' ? 'active' : ''}" onclick="FilesPage.setScope('group')">Topar</button>
+                        <button class="btn btn-sm ${this.currentScope === 'public' ? 'active' : ''}" onclick="FilesPage.setScope('public')">Umumy</button>
                     </div>
                 </div>
                 <div class="files-toolbar-right">
@@ -67,7 +68,7 @@ const FilesPage = {
     renderBreadcrumbs() {
         const el = document.getElementById('breadcrumbs');
         if (!el) return;
-        let h = `<a class="breadcrumb-item" onclick="FilesPage.goToFolder(null)">${this.currentScope === 'personal' ? 'Şahsy' : 'Topar'}</a>`;
+        let h = `<a class="breadcrumb-item" onclick="FilesPage.goToFolder(null)">${this.currentScope === 'personal' ? 'Şahsy' : this.currentScope === 'group' ? 'Topar' : 'Umumy'}</a>`;
         for (const b of this.breadcrumbs) {
             h += `<span class="breadcrumb-sep">/</span><a class="breadcrumb-item" onclick="FilesPage.goToFolder(${b.id})">${UI.esc(b.name)}</a>`;
         }

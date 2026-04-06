@@ -33,18 +33,27 @@ func (d *DB) GetFile(id int) (*models.File, error) {
 }
 
 func (d *DB) ListFiles(ownerID int, groupID *int, scope string, folderID *int, sort, order string) ([]models.File, error) {
-	q := `SELECT id, name, mime_type, size_bytes, minio_bucket, minio_key, folder_id, owner_id, group_id, scope, visibility, version, created_at, updated_at FROM files WHERE scope = $1`
-	args := []any{scope}
-	n := 1
+	var q string
+	var args []any
+	var n int
 
-	if scope == "personal" {
-		n++
-		q += ` AND owner_id = $` + strconv.Itoa(n)
-		args = append(args, ownerID)
-	} else if scope == "group" && groupID != nil {
-		n++
-		q += ` AND group_id = $` + strconv.Itoa(n)
-		args = append(args, *groupID)
+	if scope == "public" {
+		q = `SELECT id, name, mime_type, size_bytes, minio_bucket, minio_key, folder_id, owner_id, group_id, scope, visibility, version, created_at, updated_at FROM files WHERE visibility = 'public'`
+		n = 0
+	} else {
+		q = `SELECT id, name, mime_type, size_bytes, minio_bucket, minio_key, folder_id, owner_id, group_id, scope, visibility, version, created_at, updated_at FROM files WHERE scope = $1`
+		args = []any{scope}
+		n = 1
+
+		if scope == "personal" {
+			n++
+			q += ` AND owner_id = $` + strconv.Itoa(n)
+			args = append(args, ownerID)
+		} else if scope == "group" && groupID != nil {
+			n++
+			q += ` AND group_id = $` + strconv.Itoa(n)
+			args = append(args, *groupID)
+		}
 	}
 
 	if folderID != nil {
@@ -166,9 +175,18 @@ func (d *DB) CreateFolder(f *models.Folder) error {
 }
 
 func (d *DB) ListFolders(ownerID int, groupID *int, scope string, parentID *int) ([]models.Folder, error) {
-	q := `SELECT id, name, parent_id, owner_id, group_id, scope, created_at FROM folders WHERE scope = $1`
-	args := []any{scope}
-	n := 1
+	var q string
+	var args []any
+	var n int
+
+	if scope == "public" {
+		// Public scope: no folders (public files are shown flat)
+		return []models.Folder{}, nil
+	}
+
+	q = `SELECT id, name, parent_id, owner_id, group_id, scope, created_at FROM folders WHERE scope = $1`
+	args = []any{scope}
+	n = 1
 
 	if scope == "personal" {
 		n++

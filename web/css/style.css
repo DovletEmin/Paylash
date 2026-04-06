@@ -182,8 +182,9 @@ select.form-control,select.form-input{appearance:none;cursor:pointer;background-
 .files-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;flex-wrap:wrap}
 .files-toolbar-left{display:flex;align-items:center;gap:8px}
 .files-toolbar-right{display:flex;align-items:center;gap:6px}
-.scope-toggle{display:flex;border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
-.scope-toggle .btn{border:none;border-radius:0;padding:6px 14px}
+.scope-toggle{display:flex;border:1px solid var(--border);border-radius:var(--r);overflow:hidden;background:var(--surface)}
+.scope-toggle .btn{border:none;border-radius:0;padding:6px 14px;color:var(--text-2)}
+.scope-toggle .btn:hover{background:var(--surface-2);color:var(--text)}
 .scope-toggle .btn.active{background:var(--primary-bg);color:var(--primary)}
 .search-box{position:relative}
 .search-box input{
