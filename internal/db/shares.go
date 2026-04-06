@@ -129,7 +129,20 @@ func (d *DB) CanAccessFile(fileID, userID int, groupID *int, requiredPerm string
 		return true, nil
 	}
 
-	// Check group scope — members of same group have access
+	// Check explicit share FIRST (highest priority — user-to-user sharing)
+	var perm string
+	err = d.QueryRow(
+		`SELECT permission FROM file_shares WHERE file_id = $1 AND shared_with = $2`, fileID, userID,
+	).Scan(&perm)
+	if err == nil {
+		// Explicit share found
+		if requiredPerm == "view" {
+			return true, nil // any share grants view
+		}
+		return perm == "edit", nil // edit only if share is "edit"
+	}
+
+	// Check group scope — members of same group can access group-scoped files
 	var fileGroupID *int
 	var scope string
 	var visibility string
@@ -141,28 +154,16 @@ func (d *DB) CanAccessFile(fileID, userID int, groupID *int, requiredPerm string
 		return true, nil
 	}
 
-	// Check visibility
-	if visibility == "public" && requiredPerm == "view" {
-		return true, nil
+	// Check visibility — public files visible to all, group-visible to same-group users
+	if visibility == "public" {
+		return requiredPerm == "view", nil
 	}
-	if visibility == "group" && requiredPerm == "view" && groupID != nil {
+	if visibility == "group" && groupID != nil {
 		var ownerGroupID *int
 		_ = d.QueryRow(`SELECT group_id FROM users WHERE id = $1`, ownerID).Scan(&ownerGroupID)
 		if ownerGroupID != nil && *ownerGroupID == *groupID {
-			return true, nil
+			return requiredPerm == "view", nil
 		}
-	}
-
-	// Check explicit share
-	var perm string
-	err = d.QueryRow(
-		`SELECT permission FROM file_shares WHERE file_id = $1 AND shared_with = $2`, fileID, userID,
-	).Scan(&perm)
-	if err == nil {
-		if requiredPerm == "view" || perm == "edit" {
-			return true, nil
-		}
-		return perm == requiredPerm, nil
 	}
 
 	// Check public share within group

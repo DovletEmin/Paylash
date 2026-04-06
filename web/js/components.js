@@ -90,17 +90,17 @@ const UI = {
 
     isCollaboraEditable(name) {
         const ext = name.split('.').pop().toLowerCase();
-        return ['doc','docx','odt','xls','xlsx','ods','ppt','pptx','odp'].includes(ext);
+        return ['doc','docx','odt','xls','xlsx','ods','ppt','pptx','odp','csv'].includes(ext);
     },
 
     isCollaboraViewable(name) {
         const ext = name.split('.').pop().toLowerCase();
-        return ['doc','docx','odt','xls','xlsx','ods','ppt','pptx','odp','pdf'].includes(ext);
+        return ['doc','docx','odt','xls','xlsx','ods','ppt','pptx','odp','pdf','csv'].includes(ext);
     },
 
     isMediaPreviewable(name) {
         const ext = name.split('.').pop().toLowerCase();
-        return this.isImage(ext) || this.isAudio(ext) || this.isVideo(ext);
+        return this.isImage(ext) || this.isAudio(ext) || this.isVideo(ext) || this.isText(ext);
     },
 
     isImage(ext) {
@@ -115,11 +115,17 @@ const UI = {
         return ['mp4','webm','ogg','mov','avi','mkv','wmv','flv','m4v'].includes(ext);
     },
 
+    isText(ext) {
+        return ['txt','log','md','json','xml','yaml','yml','ini','cfg','conf','sh','bat','ps1',
+                'py','js','ts','go','java','c','cpp','h','hpp','css','html','htm','sql','env','toml'].includes(ext);
+    },
+
     mediaType(name) {
         const ext = name.split('.').pop().toLowerCase();
         if (this.isImage(ext)) return 'image';
         if (this.isAudio(ext)) return 'audio';
         if (this.isVideo(ext)) return 'video';
+        if (this.isText(ext)) return 'text';
         return null;
     },
 

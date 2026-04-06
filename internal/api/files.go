@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"net/http"
@@ -9,6 +10,7 @@ import (
 	"paylash/internal/storage"
 	"strconv"
 	"strings"
+	"time"
 )
 
 func (h *Handler) ListFiles(w http.ResponseWriter, r *http.Request) {
@@ -162,9 +164,24 @@ func (h *Handler) DownloadFile(w http.ResponseWriter, r *http.Request) {
 	}
 	defer obj.Close()
 
-	w.Header().Set("Content-Type", f.MimeType)
-	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, f.Name))
-	io.Copy(w, obj)
+	// Read full content for http.ServeContent (supports Range requests for video/audio)
+	data, err := io.ReadAll(obj)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "faýly okap bolmady")
+		return
+	}
+
+	// Determine if inline or attachment
+	disposition := "attachment"
+	ct := f.MimeType
+	if strings.HasPrefix(ct, "image/") || strings.HasPrefix(ct, "audio/") || strings.HasPrefix(ct, "video/") ||
+		ct == "application/pdf" || strings.HasPrefix(ct, "text/") {
+		disposition = "inline"
+	}
+
+	w.Header().Set("Content-Type", ct)
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`%s; filename="%s"`, disposition, f.Name))
+	http.ServeContent(w, r, f.Name, time.Now(), bytes.NewReader(data))
 }
 
 func (h *Handler) RenameFile(w http.ResponseWriter, r *http.Request) {

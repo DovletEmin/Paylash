@@ -41,10 +41,25 @@ const PreviewPage = {
                 <audio controls autoplay src="${url}" style="width:100%;max-width:500px"></audio>
             </div>`;
         } else if (type === 'video') {
-            c.innerHTML = `<div class="preview-media preview-video"><video controls autoplay src="${url}"></video></div>`;
+            c.innerHTML = `<div class="preview-media preview-video"><video controls autoplay preload="metadata"><source src="${url}" type="${this.guessMime()}">Siziň brauzeriňiz wideo görkezmeýär.</video></div>`;
+        } else if (type === 'text') {
+            try {
+                const res = await fetch(url, { credentials: 'same-origin' });
+                if (!res.ok) throw new Error('Ýükläp bolmady');
+                const text = await res.text();
+                c.innerHTML = `<div class="preview-media preview-text"><pre class="preview-code">${UI.esc(text)}</pre></div>`;
+            } catch (e) {
+                c.innerHTML = `<div class="empty-state"><p>Faýly ýükläp bolmady</p><p class="text-muted">${UI.esc(e.message)}</p></div>`;
+            }
         } else {
             c.innerHTML = '<div class="empty-state"><p>Bu faýly görkezip bolmaýar</p></div>';
         }
+    },
+
+    guessMime() {
+        const ext = this.currentFileName.split('.').pop().toLowerCase();
+        const map = { mp4:'video/mp4', webm:'video/webm', ogg:'video/ogg', mov:'video/mp4', m4v:'video/mp4' };
+        return map[ext] || 'video/mp4';
     },
 
     toggleZoom(img) {
