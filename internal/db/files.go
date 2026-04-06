@@ -1,0 +1,219 @@
+package db
+
+import (
+	"database/sql"
+	"paylash/internal/models"
+	"strconv"
+)
+
+// Files
+
+func (d *DB) CreateFile(f *models.File) error {
+	return d.QueryRow(
+		`INSERT INTO files (name, mime_type, size_bytes, minio_bucket, minio_key, folder_id, owner_id, group_id, scope)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		 RETURNING id, created_at, updated_at`,
+		f.Name, f.MimeType, f.SizeBytes, f.MinioBucket, f.MinioKey, f.FolderID, f.OwnerID, f.GroupID, f.Scope,
+	).Scan(&f.ID, &f.CreatedAt, &f.UpdatedAt)
+}
+
+func (d *DB) GetFile(id int) (*models.File, error) {
+	f := &models.File{}
+	err := d.QueryRow(
+		`SELECT id, name, mime_type, size_bytes, minio_bucket, minio_key, folder_id, owner_id, group_id, scope, version, created_at, updated_at
+		 FROM files WHERE id = $1`, id,
+	).Scan(&f.ID, &f.Name, &f.MimeType, &f.SizeBytes, &f.MinioBucket, &f.MinioKey, &f.FolderID, &f.OwnerID, &f.GroupID, &f.Scope, &f.Version, &f.CreatedAt, &f.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	return f, err
+}
+
+func (d *DB) ListFiles(ownerID int, groupID *int, scope string, folderID *int, sort, order string) ([]models.File, error) {
+	q := `SELECT id, name, mime_type, size_bytes, minio_bucket, minio_key, folder_id, owner_id, group_id, scope, version, created_at, updated_at FROM files WHERE scope = $1`
+	args := []any{scope}
+	n := 1
+
+	if scope == "personal" {
+		n++
+		q += ` AND owner_id = $` + strconv.Itoa(n)
+		args = append(args, ownerID)
+	} else if scope == "group" && groupID != nil {
+		n++
+		q += ` AND group_id = $` + strconv.Itoa(n)
+		args = append(args, *groupID)
+	}
+
+	if folderID != nil {
+		n++
+		q += ` AND folder_id = $` + strconv.Itoa(n)
+		args = append(args, *folderID)
+	} else {
+		q += ` AND folder_id IS NULL`
+	}
+
+	switch sort {
+	case "name":
+		q += ` ORDER BY name`
+	case "size":
+		q += ` ORDER BY size_bytes`
+	case "date":
+		q += ` ORDER BY updated_at`
+	default:
+		q += ` ORDER BY name`
+	}
+	if order == "desc" {
+		q += ` DESC`
+	}
+
+	rows, err := d.Query(q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var files []models.File
+	for rows.Next() {
+		var f models.File
+		if err := rows.Scan(&f.ID, &f.Name, &f.MimeType, &f.SizeBytes, &f.MinioBucket, &f.MinioKey, &f.FolderID, &f.OwnerID, &f.GroupID, &f.Scope, &f.Version, &f.CreatedAt, &f.UpdatedAt); err != nil {
+			return nil, err
+		}
+		files = append(files, f)
+	}
+	return files, rows.Err()
+}
+
+func (d *DB) RenameFile(id int, name string) error {
+	_, err := d.Exec(`UPDATE files SET name = $1, updated_at = NOW() WHERE id = $2`, name, id)
+	return err
+}
+
+func (d *DB) DeleteFile(id int) error {
+	_, err := d.Exec(`DELETE FROM files WHERE id = $1`, id)
+	return err
+}
+
+func (d *DB) UpdateFileVersion(id int, sizeBytes int64) error {
+	_, err := d.Exec(`UPDATE files SET version = version + 1, size_bytes = $1, updated_at = NOW() WHERE id = $2`, sizeBytes, id)
+	return err
+}
+
+func (d *DB) SearchFiles(ownerID int, groupID *int, query string) ([]models.File, error) {
+	q := `SELECT id, name, mime_type, size_bytes, minio_bucket, minio_key, folder_id, owner_id, group_id, scope, version, created_at, updated_at
+	      FROM files WHERE name ILIKE $1 AND (owner_id = $2`
+	args := []any{"%" + query + "%", ownerID}
+	if groupID != nil {
+		q += ` OR group_id = $3)`
+		args = append(args, *groupID)
+	} else {
+		q += `)`
+	}
+	q += ` ORDER BY updated_at DESC LIMIT 50`
+
+	rows, err := d.Query(q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var files []models.File
+	for rows.Next() {
+		var f models.File
+		if err := rows.Scan(&f.ID, &f.Name, &f.MimeType, &f.SizeBytes, &f.MinioBucket, &f.MinioKey, &f.FolderID, &f.OwnerID, &f.GroupID, &f.Scope, &f.Version, &f.CreatedAt, &f.UpdatedAt); err != nil {
+			return nil, err
+		}
+		files = append(files, f)
+	}
+	return files, rows.Err()
+}
+
+func (d *DB) GetStorageUsage(ownerID int, scope string, groupID *int) (*models.StorageUsage, error) {
+	su := &models.StorageUsage{}
+	if scope == "personal" {
+		err := d.QueryRow(`SELECT COALESCE(SUM(size_bytes), 0) FROM files WHERE owner_id = $1 AND scope = 'personal'`, ownerID).Scan(&su.UsedBytes)
+		if err != nil {
+			return nil, err
+		}
+		err = d.QueryRow(`SELECT quota_bytes FROM users WHERE id = $1`, ownerID).Scan(&su.QuotaBytes)
+		return su, err
+	}
+	if groupID != nil {
+		err := d.QueryRow(`SELECT COALESCE(SUM(size_bytes), 0) FROM files WHERE group_id = $1 AND scope = 'group'`, *groupID).Scan(&su.UsedBytes)
+		if err != nil {
+			return nil, err
+		}
+		err = d.QueryRow(`SELECT quota_bytes FROM groups WHERE id = $1`, *groupID).Scan(&su.QuotaBytes)
+		return su, err
+	}
+	return su, nil
+}
+
+// Folders
+
+func (d *DB) CreateFolder(f *models.Folder) error {
+	return d.QueryRow(
+		`INSERT INTO folders (name, parent_id, owner_id, group_id, scope)
+		 VALUES ($1, $2, $3, $4, $5)
+		 RETURNING id, created_at`,
+		f.Name, f.ParentID, f.OwnerID, f.GroupID, f.Scope,
+	).Scan(&f.ID, &f.CreatedAt)
+}
+
+func (d *DB) ListFolders(ownerID int, groupID *int, scope string, parentID *int) ([]models.Folder, error) {
+	q := `SELECT id, name, parent_id, owner_id, group_id, scope, created_at FROM folders WHERE scope = $1`
+	args := []any{scope}
+	n := 1
+
+	if scope == "personal" {
+		n++
+		q += ` AND owner_id = $` + strconv.Itoa(n)
+		args = append(args, ownerID)
+	} else if scope == "group" && groupID != nil {
+		n++
+		q += ` AND group_id = $` + strconv.Itoa(n)
+		args = append(args, *groupID)
+	}
+
+	if parentID != nil {
+		n++
+		q += ` AND parent_id = $` + strconv.Itoa(n)
+		args = append(args, *parentID)
+	} else {
+		q += ` AND parent_id IS NULL`
+	}
+	q += ` ORDER BY name`
+
+	rows, err := d.Query(q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var folders []models.Folder
+	for rows.Next() {
+		var f models.Folder
+		if err := rows.Scan(&f.ID, &f.Name, &f.ParentID, &f.OwnerID, &f.GroupID, &f.Scope, &f.CreatedAt); err != nil {
+			return nil, err
+		}
+		folders = append(folders, f)
+	}
+	return folders, rows.Err()
+}
+
+func (d *DB) GetFolder(id int) (*models.Folder, error) {
+	f := &models.Folder{}
+	err := d.QueryRow(
+		`SELECT id, name, parent_id, owner_id, group_id, scope, created_at FROM folders WHERE id = $1`, id,
+	).Scan(&f.ID, &f.Name, &f.ParentID, &f.OwnerID, &f.GroupID, &f.Scope, &f.CreatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	return f, err
+}
+
+func (d *DB) RenameFolder(id int, name string) error {
+	_, err := d.Exec(`UPDATE folders SET name = $1 WHERE id = $2`, name, id)
+	return err
+}
+
+func (d *DB) DeleteFolder(id int) error {
+	_, err := d.Exec(`DELETE FROM folders WHERE id = $1`, id)
+	return err
+}
