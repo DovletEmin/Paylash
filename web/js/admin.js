@@ -131,7 +131,7 @@ const AdminPage = {
             let all = [];
             for (const f of facs) { const cs = (await API.catalogs.courses(f.id)) || []; for (const c of cs) { const gs = await API.catalogs.groups(c.id); if (gs) all.push(...gs.map(g => ({ ...g, course_name: c.name, faculty_name: f.name }))); } }
             el.innerHTML = `
-            <div class="admin-header"><h2>Toparlar</h2><button class="btn btn-primary btn-sm" onclick="AdminPage.showGroupModal()">${UI.icons.plus} Täze</button></div>
+            <div class="admin-header"><h2>Toparlar</h2><div style="display:flex;gap:8px"><button class="btn btn-ghost btn-sm" onclick="AdminPage.showBulkGroupQuota()">📊 Kwota hemmesine</button><button class="btn btn-primary btn-sm" onclick="AdminPage.showGroupModal()">${UI.icons.plus} Täze</button></div></div>
             <table class="admin-table"><thead><tr><th>ID</th><th>Ady</th><th>Ugur</th><th>Fakultet</th><th>Hereketler</th></tr></thead><tbody>
             ${all.map(g => `<tr><td>${g.id}</td><td>${UI.esc(g.name)}</td><td>${UI.esc(g.course_name)}</td><td>${UI.esc(g.faculty_name)}</td><td>
                 <button class="btn btn-sm btn-ghost" onclick="AdminPage.showGroupModal(${g.id},'${UI.esc(g.name)}',${g.course_id})">✏️</button>
@@ -176,6 +176,7 @@ const AdminPage = {
             <div class="admin-header"><h2>Ulanyjylar</h2>
                 <div style="display:flex;gap:8px;align-items:center">
                     <input type="text" id="admin-user-search" class="form-control" placeholder="Gözle…" style="width:200px" oninput="AdminPage.filterUsers(this.value)">
+                    <button class="btn btn-ghost btn-sm" onclick="AdminPage.showBulkUserQuota()">📊 Kwota hemmesine</button>
                     <button class="btn btn-primary btn-sm" onclick="AdminPage.showCreateUserModal()">${UI.icons.plus} Täze</button>
                 </div>
             </div>
@@ -202,7 +203,7 @@ const AdminPage = {
         UI.showModal('Täze ulanyjy', `
             <div class="form-group"><label>Doly ady</label><input type="text" id="nu-name" class="form-control" placeholder="Ady we familiýasy"></div>
             <div class="form-group"><label>Ulanyjy ady</label><input type="text" id="nu-username" class="form-control" placeholder="username"></div>
-            <div class="form-group"><label>Parol</label><input type="password" id="nu-password" class="form-control" placeholder="Azyndan 6 simwol"></div>
+            <div class="form-group"><label>Parol</label>${UI.passwordField('nu-password', 'Azyndan 6 simwol')}</div>
             <div class="form-group"><label>Rol</label><select id="nu-role" class="form-control"><option value="user">Ulanyjy</option><option value="admin">Admin</option></select></div>
             <div class="form-group"><label>Kwota (MB)</label><input type="number" id="nu-quota" class="form-control" value="10240" min="0"></div>
             <div class="form-group"><label>Fakultet</label><select id="nu-faculty" class="form-control" onchange="AdminPage.onNewUserFacultyChange()"><option value="">Saýlaň…</option>${fOpts}</select></div>
@@ -246,7 +247,7 @@ const AdminPage = {
         const mb = Math.round((u.quota_bytes || 0) / (1024 * 1024));
         UI.showModal('Ulanyjyny üýtget', `
             <div class="form-group"><label>Doly ady</label><input type="text" id="eu-name" value="${UI.esc(u.full_name)}" class="form-control"></div>
-            <div class="form-group"><label>Täze parol</label><input type="password" id="eu-password" class="form-control" placeholder="Boş goýsaň üýtgemez"></div>
+            <div class="form-group"><label>Täze parol</label>${UI.passwordField('eu-password', 'Boş goýsaň üýtgemez')}</div>
             <div class="form-group"><label>Rol</label><select id="eu-role" class="form-control"><option value="user" ${u.role==='user'?'selected':''}>Ulanyjy</option><option value="admin" ${u.role==='admin'?'selected':''}>Admin</option></select></div>
             <div class="form-group"><label>Kwota (MB)</label><input type="number" id="eu-quota" value="${mb}" class="form-control" min="0"></div>`,
             `<button class="btn btn-ghost" onclick="UI.closeModal()">Ýatyr</button><button class="btn btn-primary" onclick="AdminPage.saveUser(${id})">Ýatda sakla</button>`);
@@ -264,5 +265,29 @@ const AdminPage = {
     async deleteUser(id) {
         if (!confirm('Bu ulanyjyny pozmak isleýärsiňizmi?')) return;
         try { await API.admin.users.delete(id); UI.toast('Pozuldy', 'success'); this.switchTab('users'); } catch (e) { UI.toast(e.message, 'error'); }
+    },
+
+    showBulkUserQuota() {
+        UI.showModal('Ähli ulanyjylaryň kwotasy', `
+            <div class="form-group"><label>Täze kwota (MB)</label><input type="number" id="bulk-user-quota" class="form-control" value="10240" min="1"></div>
+            <p class="text-muted" style="font-size:.78rem">Bu ähli ulanyjylaryň (admin-den başga) kwotasyny üýtgeder.</p>`,
+            `<button class="btn btn-ghost" onclick="UI.closeModal()">Ýatyr</button><button class="btn btn-primary" onclick="AdminPage.doBulkUserQuota()">Üýtget</button>`);
+    },
+    async doBulkUserQuota() {
+        const mb = parseInt(document.getElementById('bulk-user-quota').value) || 0;
+        if (mb <= 0) { UI.toast('Dogry kwota giriziň', 'error'); return; }
+        try { await API.admin.users.bulkQuota(mb); UI.closeModal(); UI.toast('Ähli ulanyjylaryň kwotasy üýtgedildi', 'success'); this.switchTab('users'); } catch (e) { UI.toast(e.message, 'error'); }
+    },
+
+    showBulkGroupQuota() {
+        UI.showModal('Ähli toparlaryň kwotasy', `
+            <div class="form-group"><label>Täze kwota (MB)</label><input type="number" id="bulk-group-quota" class="form-control" value="51200" min="1"></div>
+            <p class="text-muted" style="font-size:.78rem">Bu ähli toparlaryň kwotasyny üýtgeder.</p>`,
+            `<button class="btn btn-ghost" onclick="UI.closeModal()">Ýatyr</button><button class="btn btn-primary" onclick="AdminPage.doBulkGroupQuota()">Üýtget</button>`);
+    },
+    async doBulkGroupQuota() {
+        const mb = parseInt(document.getElementById('bulk-group-quota').value) || 0;
+        if (mb <= 0) { UI.toast('Dogry kwota giriziň', 'error'); return; }
+        try { await API.admin.groups.bulkQuota(mb); UI.closeModal(); UI.toast('Ähli toparlaryň kwotasy üýtgedildi', 'success'); this.switchTab('groups'); } catch (e) { UI.toast(e.message, 'error'); }
     }
 };

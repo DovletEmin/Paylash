@@ -92,6 +92,8 @@ func (s *Server) routes(webFS embed.FS) {
 	s.mux.Handle("POST /api/admin/users", auth(AdminMiddleware(http.HandlerFunc(h.AdminCreateUser))))
 	s.mux.Handle("PATCH /api/admin/users/{id}", auth(AdminMiddleware(http.HandlerFunc(h.AdminUpdateUser))))
 	s.mux.Handle("DELETE /api/admin/users/{id}", auth(AdminMiddleware(http.HandlerFunc(h.AdminDeleteUser))))
+	s.mux.Handle("POST /api/admin/users/bulk-quota", auth(AdminMiddleware(http.HandlerFunc(h.AdminBulkUserQuota))))
+	s.mux.Handle("POST /api/admin/groups/bulk-quota", auth(AdminMiddleware(http.HandlerFunc(h.AdminBulkGroupQuota))))
 
 	// WOPI endpoints (accessed by Collabora, token-based auth)
 	s.mux.HandleFunc("GET /wopi/files/{id}", wopiH.CheckFileInfo)

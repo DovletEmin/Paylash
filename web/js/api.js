@@ -138,6 +138,7 @@ const API = {
             create(name, courseId) { return API._request('POST', '/api/admin/groups', { name, course_id: courseId }); },
             update(id, name, courseId) { return API._request('PATCH', `/api/admin/groups/${id}`, { name }); },
             delete(id) { return API._request('DELETE', `/api/admin/groups/${id}`); },
+            bulkQuota(quotaMB) { return API._request('POST', '/api/admin/groups/bulk-quota', { quota_mb: quotaMB }); },
         },
         users: {
             list(filters) {
@@ -152,6 +153,7 @@ const API = {
                 return API._request('PATCH', `/api/admin/users/${id}`, data);
             },
             delete(id) { return API._request('DELETE', `/api/admin/users/${id}`); },
+            bulkQuota(quotaMB) { return API._request('POST', '/api/admin/users/bulk-quota', { quota_mb: quotaMB }); },
         },
     },
 };

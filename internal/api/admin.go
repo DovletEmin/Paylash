@@ -300,3 +300,33 @@ func (h *Handler) AdminCreateUser(w http.ResponseWriter, r *http.Request) {
 	h.minio.EnsureBucket(r.Context(), bucket)
 	writeJSON(w, http.StatusCreated, user)
 }
+
+func (h *Handler) AdminBulkUserQuota(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		QuotaMB int64 `json:"quota_mb"`
+	}
+	if err := readJSON(r, &req); err != nil || req.QuotaMB <= 0 {
+		writeError(w, http.StatusBadRequest, "kwota girizilmeli")
+		return
+	}
+	if err := h.db.SetAllUsersQuota(req.QuotaMB * 1024 * 1024); err != nil {
+		writeError(w, http.StatusInternalServerError, "\u00fc\u00fdtgedip bolmady")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+func (h *Handler) AdminBulkGroupQuota(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		QuotaMB int64 `json:"quota_mb"`
+	}
+	if err := readJSON(r, &req); err != nil || req.QuotaMB <= 0 {
+		writeError(w, http.StatusBadRequest, "kwota girizilmeli")
+		return
+	}
+	if err := h.db.SetAllGroupsQuota(req.QuotaMB * 1024 * 1024); err != nil {
+		writeError(w, http.StatusInternalServerError, "\u00fc\u00fdtgedip bolmady")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}

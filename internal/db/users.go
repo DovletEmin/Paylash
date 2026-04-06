@@ -125,6 +125,16 @@ func (d *DB) UpdatePassword(id int, hash string) error {
 	return err
 }
 
+func (d *DB) SetAllUsersQuota(quotaBytes int64) error {
+	_, err := d.Exec(`UPDATE users SET quota_bytes = $1 WHERE role = 'user'`, quotaBytes)
+	return err
+}
+
+func (d *DB) SetAllGroupsQuota(quotaBytes int64) error {
+	_, err := d.Exec(`UPDATE groups SET quota_bytes = $1`, quotaBytes)
+	return err
+}
+
 func (d *DB) UserExists(username string) (bool, error) {
 	var exists bool
 	err := d.QueryRow(`SELECT EXISTS(SELECT 1 FROM users WHERE username = $1)`, username).Scan(&exists)
