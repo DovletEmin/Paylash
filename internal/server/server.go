@@ -54,6 +54,7 @@ func (s *Server) routes(webFS embed.FS) {
 	// Files
 	s.mux.Handle("GET /api/files", auth(http.HandlerFunc(h.ListFiles)))
 	s.mux.Handle("POST /api/files/upload", auth(http.HandlerFunc(h.UploadFile)))
+	s.mux.Handle("POST /api/files/create", auth(http.HandlerFunc(h.CreateBlankFile)))
 	s.mux.Handle("GET /api/files/{id}/download", auth(http.HandlerFunc(h.DownloadFile)))
 	s.mux.Handle("PATCH /api/files/{id}", auth(http.HandlerFunc(h.RenameFile)))
 	s.mux.Handle("DELETE /api/files/{id}", auth(http.HandlerFunc(h.DeleteFile)))

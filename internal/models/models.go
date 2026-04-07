@@ -131,6 +131,14 @@ type RenameRequest struct {
 	Name string `json:"name"`
 }
 
+type CreateBlankFileRequest struct {
+	Name     string `json:"name"`
+	Type     string `json:"type"` // docx, xlsx, pdf
+	Scope    string `json:"scope"`
+	FolderID *int   `json:"folder_id"`
+	GroupID  *int   `json:"group_id"`
+}
+
 type VisibilityRequest struct {
 	Visibility string `json:"visibility"`
 }

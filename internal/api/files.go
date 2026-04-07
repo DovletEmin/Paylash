@@ -1,6 +1,7 @@
 package api
 
 import (
+	"archive/zip"
 	"bytes"
 	"fmt"
 	"io"
@@ -303,6 +304,252 @@ func (h *Handler) StorageUsage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, usage)
+}
+
+func (h *Handler) CreateBlankFile(w http.ResponseWriter, r *http.Request) {
+	user := authutil.GetUser(r)
+
+	var req models.CreateBlankFileRequest
+	if err := readJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "nädogry maglumat")
+		return
+	}
+
+	req.Type = strings.ToLower(strings.TrimSpace(req.Type))
+	if req.Type != "docx" && req.Type != "xlsx" && req.Type != "pdf" {
+		writeError(w, http.StatusBadRequest, "nädogry faýl görnüşi (docx, xlsx, pdf)")
+		return
+	}
+
+	name := strings.TrimSpace(req.Name)
+	if name == "" {
+		name = "Täze dokument"
+	}
+	if !strings.HasSuffix(strings.ToLower(name), "."+req.Type) {
+		name = name + "." + req.Type
+	}
+
+	scope := req.Scope
+	if scope == "" {
+		scope = "personal"
+	}
+	if (scope == "group" || scope == "public") && user.Role != "admin" {
+		writeError(w, http.StatusForbidden, "diňe admin topar/umumy faýl döredip biler")
+		return
+	}
+
+	var bucket string
+	var groupID *int
+	if scope == "group" {
+		if req.GroupID != nil {
+			groupID = req.GroupID
+		} else {
+			groupID = user.GroupID
+		}
+		if groupID == nil || *groupID <= 0 {
+			writeError(w, http.StatusBadRequest, "topar saýlanmaly")
+			return
+		}
+		bucket = storage.GroupBucket(*groupID)
+	} else if scope == "public" {
+		bucket = "public-files"
+	} else {
+		scope = "personal"
+		bucket = storage.PersonalBucket(user.ID)
+	}
+
+	// Generate blank file content
+	var fileBytes []byte
+	var mimeType string
+	var err error
+
+	switch req.Type {
+	case "docx":
+		fileBytes, err = generateBlankDOCX()
+		mimeType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+	case "xlsx":
+		fileBytes, err = generateBlankXLSX()
+		mimeType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+	case "pdf":
+		fileBytes = generateBlankPDF()
+		mimeType = "application/pdf"
+	}
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "faýl döredip bolmady")
+		return
+	}
+
+	// Check quota
+	usage, err := h.db.GetStorageUsage(user.ID, scope, groupID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "ammar maglumatyny alyp bolmady")
+		return
+	}
+	if usage.UsedBytes+int64(len(fileBytes)) > usage.QuotaBytes {
+		writeError(w, http.StatusForbidden, "ammar doly, ýer ýok")
+		return
+	}
+
+	if err := h.minio.EnsureBucket(r.Context(), bucket); err != nil {
+		writeError(w, http.StatusInternalServerError, "ammar döredip bolmady")
+		return
+	}
+
+	key := fmt.Sprintf("%d/%s", user.ID, name)
+	if req.FolderID != nil {
+		key = fmt.Sprintf("%d/f%d/%s", user.ID, *req.FolderID, name)
+	}
+
+	reader := bytes.NewReader(fileBytes)
+	if err := h.minio.Upload(r.Context(), bucket, key, reader, int64(len(fileBytes)), mimeType); err != nil {
+		writeError(w, http.StatusInternalServerError, "faýly ýükläp bolmady")
+		return
+	}
+
+	f := &models.File{
+		Name:        name,
+		MimeType:    mimeType,
+		SizeBytes:   int64(len(fileBytes)),
+		MinioBucket: bucket,
+		MinioKey:    key,
+		FolderID:    req.FolderID,
+		OwnerID:     user.ID,
+		GroupID:     groupID,
+		Scope:       scope,
+	}
+	if scope == "group" {
+		f.Visibility = "group"
+	} else if scope == "public" {
+		f.Visibility = "public"
+	}
+	if err := h.db.CreateFile(f); err != nil {
+		writeError(w, http.StatusInternalServerError, "faýl maglumatyny saklap bolmady")
+		return
+	}
+
+	writeJSON(w, http.StatusCreated, f)
+}
+
+// generateBlankDOCX creates a minimal valid DOCX file
+func generateBlankDOCX() ([]byte, error) {
+	buf := new(bytes.Buffer)
+	zw := zip.NewWriter(buf)
+
+	contentTypes := `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+</Types>`
+
+	rels := `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>`
+
+	document := `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p><w:r><w:t></w:t></w:r></w:p>
+  </w:body>
+</w:document>`
+
+	files := map[string]string{
+		"[Content_Types].xml": contentTypes,
+		"_rels/.rels":         rels,
+		"word/document.xml":   document,
+	}
+
+	for name, content := range files {
+		fw, err := zw.Create(name)
+		if err != nil {
+			return nil, err
+		}
+		if _, err := fw.Write([]byte(content)); err != nil {
+			return nil, err
+		}
+	}
+
+	if err := zw.Close(); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+// generateBlankXLSX creates a minimal valid XLSX file using excelize
+func generateBlankXLSX() ([]byte, error) {
+	buf := new(bytes.Buffer)
+	zw := zip.NewWriter(buf)
+
+	contentTypes := `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
+  <Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+</Types>`
+
+	rels := `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
+</Relationships>`
+
+	workbookRels := `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
+</Relationships>`
+
+	workbook := `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <sheets><sheet name="Sheet1" sheetId="1" r:id="rId1"/></sheets>
+</workbook>`
+
+	sheet := `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <sheetData/>
+</worksheet>`
+
+	files := map[string]string{
+		"[Content_Types].xml":      contentTypes,
+		"_rels/.rels":              rels,
+		"xl/_rels/workbook.xml.rels": workbookRels,
+		"xl/workbook.xml":          workbook,
+		"xl/worksheets/sheet1.xml": sheet,
+	}
+
+	for name, content := range files {
+		fw, err := zw.Create(name)
+		if err != nil {
+			return nil, err
+		}
+		if _, err := fw.Write([]byte(content)); err != nil {
+			return nil, err
+		}
+	}
+
+	if err := zw.Close(); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+// generateBlankPDF creates a minimal valid PDF
+func generateBlankPDF() []byte {
+	pdf := `%PDF-1.4
+1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj
+2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj
+3 0 obj<</Type/Page/MediaBox[0 0 595 842]/Parent 2 0 R/Resources<<>>>>endobj
+xref
+0 4
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+trailer<</Size 4/Root 1 0 R>>
+startxref
+206
+%%EOF`
+	return []byte(pdf)
 }
 
 // Folders
