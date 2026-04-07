@@ -44,13 +44,6 @@ const FilesPage = {
                                 <span class="new-file-option-ext">.xlsx</span>
                             </div>
                         </div>
-                        <div class="new-file-option" onclick="FilesPage.createNewFile('pdf')">
-                            <span class="new-file-option-icon pdf-icon">📄</span>
-                            <div class="new-file-option-info">
-                                <span class="new-file-option-name">PDF dokument</span>
-                                <span class="new-file-option-ext">.pdf</span>
-                            </div>
-                        </div>
                     </div>
                 </div>
             </div>` : ''}
@@ -296,7 +289,7 @@ const FilesPage = {
 
     createNewFile(type) {
         document.getElementById('new-file-menu')?.classList.add('hidden');
-        const defaults = { docx: 'Täze dokument', xlsx: 'Täze tablisa', pdf: 'Täze PDF' };
+        const defaults = { docx: 'Täze dokument', xlsx: 'Täze tablisa' };
         const defaultName = defaults[type] || 'Täze faýl';
         UI.showModal('Täze faýl döret',
             `<div class="form-group"><label>Faýlyň ady</label><input type="text" id="new-file-name" class="form-control" placeholder="${UI.esc(defaultName)}" value="${UI.esc(defaultName)}"></div>

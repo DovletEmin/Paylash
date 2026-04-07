@@ -289,9 +289,10 @@ func (h *Handler) CollaboraEditorURL(w http.ResponseWriter, r *http.Request) {
 
 	// Determine permission
 	perm := "view"
-	if f.OwnerID == user.ID {
+	isPDF := strings.HasSuffix(strings.ToLower(f.Name), ".pdf") || f.MimeType == "application/pdf"
+	if !isPDF && f.OwnerID == user.ID {
 		perm = "edit"
-	} else {
+	} else if !isPDF {
 		canEdit, _ := h.db.CanAccessFile(fileID, user.ID, user.GroupID, "edit")
 		if canEdit {
 			perm = "edit"
