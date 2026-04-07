@@ -6,13 +6,34 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"path/filepath"
 	"paylash/internal/authutil"
+	"paylash/internal/db"
 	"paylash/internal/models"
 	"paylash/internal/storage"
 	"strconv"
 	"strings"
 	"time"
 )
+
+// uniqueFileName returns a name like "file (1).docx" if "file.docx" already exists.
+func uniqueFileName(store *db.DB, name string, ownerID int, scope string, folderID *int, groupID *int) string {
+	exists, err := store.FileNameExists(name, ownerID, scope, folderID, groupID)
+	if err != nil || !exists {
+		return name
+	}
+	ext := filepath.Ext(name)
+	base := strings.TrimSuffix(name, ext)
+	for i := 1; i <= 100; i++ {
+		candidate := fmt.Sprintf("%s (%d)%s", base, i, ext)
+		exists, err = store.FileNameExists(candidate, ownerID, scope, folderID, groupID)
+		if err != nil || !exists {
+			return candidate
+		}
+	}
+	// Fallback: timestamp-based
+	return fmt.Sprintf("%s (%d)%s", base, time.Now().Unix(), ext)
+}
 
 func (h *Handler) ListFiles(w http.ResponseWriter, r *http.Request) {
 	user := authutil.GetUser(r)
@@ -128,9 +149,12 @@ func (h *Handler) UploadFile(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	key := fmt.Sprintf("%d/%s", user.ID, header.Filename)
+	// Auto-rename if duplicate name exists
+	fileName := uniqueFileName(h.db, header.Filename, user.ID, scope, folderID, groupID)
+
+	key := fmt.Sprintf("%d/%s", user.ID, fileName)
 	if folderID != nil {
-		key = fmt.Sprintf("%d/f%d/%s", user.ID, *folderID, header.Filename)
+		key = fmt.Sprintf("%d/f%d/%s", user.ID, *folderID, fileName)
 	}
 
 	contentType := header.Header.Get("Content-Type")
@@ -144,7 +168,7 @@ func (h *Handler) UploadFile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	f := &models.File{
-		Name:        header.Filename,
+		Name:        fileName,
 		MimeType:    contentType,
 		SizeBytes:   header.Size,
 		MinioBucket: bucket,
@@ -316,8 +340,8 @@ func (h *Handler) CreateBlankFile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	req.Type = strings.ToLower(strings.TrimSpace(req.Type))
-	if req.Type != "docx" && req.Type != "xlsx" && req.Type != "pdf" {
-		writeError(w, http.StatusBadRequest, "nädogry faýl görnüşi (docx, xlsx, pdf)")
+	if req.Type != "docx" && req.Type != "xlsx" {
+		writeError(w, http.StatusBadRequest, "nädogry faýl görnüşi (docx, xlsx)")
 		return
 	}
 
@@ -370,9 +394,6 @@ func (h *Handler) CreateBlankFile(w http.ResponseWriter, r *http.Request) {
 	case "xlsx":
 		fileBytes, err = generateBlankXLSX()
 		mimeType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-	case "pdf":
-		fileBytes = generateBlankPDF()
-		mimeType = "application/pdf"
 	}
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "faýl döredip bolmady")
@@ -394,6 +415,9 @@ func (h *Handler) CreateBlankFile(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "ammar döredip bolmady")
 		return
 	}
+
+	// Auto-rename if duplicate name exists
+	name = uniqueFileName(h.db, name, user.ID, scope, req.FolderID, groupID)
 
 	key := fmt.Sprintf("%d/%s", user.ID, name)
 	if req.FolderID != nil {
@@ -531,25 +555,6 @@ func generateBlankXLSX() ([]byte, error) {
 		return nil, err
 	}
 	return buf.Bytes(), nil
-}
-
-// generateBlankPDF creates a minimal valid PDF
-func generateBlankPDF() []byte {
-	pdf := `%PDF-1.4
-1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj
-2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj
-3 0 obj<</Type/Page/MediaBox[0 0 595 842]/Parent 2 0 R/Resources<<>>>>endobj
-xref
-0 4
-0000000000 65535 f 
-0000000009 00000 n 
-0000000058 00000 n 
-0000000115 00000 n 
-trailer<</Size 4/Root 1 0 R>>
-startxref
-206
-%%EOF`
-	return []byte(pdf)
 }
 
 // Folders

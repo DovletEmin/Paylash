@@ -133,7 +133,7 @@ type RenameRequest struct {
 
 type CreateBlankFileRequest struct {
 	Name     string `json:"name"`
-	Type     string `json:"type"` // docx, xlsx, pdf
+	Type     string `json:"type"` // docx, xlsx
 	Scope    string `json:"scope"`
 	FolderID *int   `json:"folder_id"`
 	GroupID  *int   `json:"group_id"`

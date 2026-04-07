@@ -142,6 +142,35 @@ func (d *DB) SetFileVisibility(fileID int, visibility string) error {
 	return err
 }
 
+// FileNameExists checks if a file with the given name exists in the same scope/folder/owner context.
+func (d *DB) FileNameExists(name string, ownerID int, scope string, folderID *int, groupID *int) (bool, error) {
+	q := `SELECT COUNT(*) FROM files WHERE name = $1 AND scope = $2`
+	args := []any{name, scope}
+	n := 2
+
+	if scope == "personal" {
+		n++
+		q += ` AND owner_id = $` + strconv.Itoa(n)
+		args = append(args, ownerID)
+	} else if scope == "group" && groupID != nil {
+		n++
+		q += ` AND group_id = $` + strconv.Itoa(n)
+		args = append(args, *groupID)
+	}
+
+	if folderID != nil {
+		n++
+		q += ` AND folder_id = $` + strconv.Itoa(n)
+		args = append(args, *folderID)
+	} else {
+		q += ` AND folder_id IS NULL`
+	}
+
+	var count int
+	err := d.QueryRow(q, args...).Scan(&count)
+	return count > 0, err
+}
+
 func (d *DB) GetStorageUsage(ownerID int, scope string, groupID *int) (*models.StorageUsage, error) {
 	su := &models.StorageUsage{}
 	if scope == "personal" {
