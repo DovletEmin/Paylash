@@ -82,6 +82,11 @@ const API = {
         delete(id) { return API._request('DELETE', `/api/files/${id}`); },
         search(q) { return API._request('GET', `/api/search?q=${encodeURIComponent(q)}`); },
         storageUsage(scope) { return API._request('GET', `/api/storage/usage?scope=${scope || 'personal'}`); },
+        createBlank(name, type, scope, folderId) {
+            const body = { name, type, scope: scope || 'personal' };
+            if (folderId) body.folder_id = folderId;
+            return API._request('POST', '/api/files/create', body);
+        },
     },
 
     folders: {

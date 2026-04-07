@@ -196,7 +196,34 @@ select.form-control,select.form-input{appearance:none;cursor:pointer;background-
 .search-box input:focus{border-color:var(--primary);width:220px}
 .search-box .search-icon{position:absolute;left:8px;top:50%;transform:translateY(-50%);color:var(--text-3)}
 .search-box .search-icon svg{width:14px;height:14px}
-.files-actions{display:flex;gap:8px;margin-bottom:16px}
+.files-actions{display:flex;gap:8px;margin-bottom:16px;align-items:center}
+
+/* ─── New File Dropdown ─── */
+.new-file-dropdown{position:relative}
+.new-file-menu{
+  position:absolute;top:calc(100% + 6px);left:0;z-index:60;
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);
+  box-shadow:0 8px 24px rgba(0,0,0,.25);min-width:220px;padding:6px;
+  animation:newFileMenuIn .15s ease-out;
+}
+@keyframes newFileMenuIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+.new-file-option{
+  display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:var(--r);
+  cursor:pointer;transition:background var(--tr);
+}
+.new-file-option:hover{background:var(--surface-2)}
+.new-file-option-icon{font-size:1.5rem;width:36px;height:36px;display:flex;align-items:center;justify-content:center;border-radius:var(--r);background:var(--surface-2)}
+.new-file-option-icon.docx-icon{background:rgba(66,133,244,.15);color:#4285f4}
+.new-file-option-icon.xlsx-icon{background:rgba(52,168,83,.15);color:#34a853}
+.new-file-option-icon.pdf-icon{background:rgba(234,67,53,.15);color:#ea4335}
+.new-file-option-info{display:flex;flex-direction:column;gap:2px}
+.new-file-option-name{font-size:.85rem;font-weight:500;color:var(--text)}
+.new-file-option-ext{font-size:.72rem;color:var(--text-3);font-family:var(--font-mono, monospace)}
+.new-file-type-badge{margin-top:8px;display:flex;align-items:center;gap:8px}
+.file-type-label{
+  display:inline-block;padding:4px 12px;border-radius:var(--r);font-size:.78rem;font-weight:600;
+  background:var(--primary);color:#fff;letter-spacing:.5px;
+}
 .breadcrumbs{display:flex;align-items:center;gap:4px;font-size:.85rem}
 .breadcrumb-item{color:var(--text-3);cursor:pointer;transition:color var(--tr)}
 .breadcrumb-item:hover{color:var(--text)}

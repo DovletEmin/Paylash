@@ -27,6 +27,32 @@ const FilesPage = {
             ${canUpload ? `<div class="files-actions">
                 <button class="btn btn-primary btn-sm" onclick="FilesPage.showUploadModal()">${UI.icons.upload} Ýükle</button>
                 <button class="btn btn-ghost btn-sm" onclick="FilesPage.showNewFolderModal()">${UI.icons.plus} Täze papka</button>
+                <div class="new-file-dropdown">
+                    <button class="btn btn-ghost btn-sm" onclick="FilesPage.toggleNewFileMenu(event)">${UI.icons.fileNew} Täze faýl</button>
+                    <div class="new-file-menu hidden" id="new-file-menu">
+                        <div class="new-file-option" onclick="FilesPage.createNewFile('docx')">
+                            <span class="new-file-option-icon docx-icon">📝</span>
+                            <div class="new-file-option-info">
+                                <span class="new-file-option-name">Word dokument</span>
+                                <span class="new-file-option-ext">.docx</span>
+                            </div>
+                        </div>
+                        <div class="new-file-option" onclick="FilesPage.createNewFile('xlsx')">
+                            <span class="new-file-option-icon xlsx-icon">📊</span>
+                            <div class="new-file-option-info">
+                                <span class="new-file-option-name">Excel tablisa</span>
+                                <span class="new-file-option-ext">.xlsx</span>
+                            </div>
+                        </div>
+                        <div class="new-file-option" onclick="FilesPage.createNewFile('pdf')">
+                            <span class="new-file-option-icon pdf-icon">📄</span>
+                            <div class="new-file-option-info">
+                                <span class="new-file-option-name">PDF dokument</span>
+                                <span class="new-file-option-ext">.pdf</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>` : ''}
             <div class="breadcrumbs" id="breadcrumbs"></div>
             <input type="file" id="file-input" multiple style="display:none" onchange="FilesPage.handleFileSelect(this.files)">
@@ -250,6 +276,49 @@ const FilesPage = {
     async doCreateFolder() {
         const n = document.getElementById('new-folder-name').value.trim(); if (!n) return;
         try { await API.folders.create(n, this.currentScope, this.currentFolder); UI.closeModal(); UI.toast('Papka döredildi', 'success'); this.loadFiles(); } catch (e) { UI.toast(e.message, 'error'); }
+    },
+
+    toggleNewFileMenu(e) {
+        e.stopPropagation();
+        const menu = document.getElementById('new-file-menu');
+        if (!menu) return;
+        menu.classList.toggle('hidden');
+        const closeMenu = (ev) => {
+            if (!menu.contains(ev.target)) {
+                menu.classList.add('hidden');
+                document.removeEventListener('click', closeMenu);
+            }
+        };
+        if (!menu.classList.contains('hidden')) {
+            setTimeout(() => document.addEventListener('click', closeMenu), 0);
+        }
+    },
+
+    createNewFile(type) {
+        document.getElementById('new-file-menu')?.classList.add('hidden');
+        const defaults = { docx: 'Täze dokument', xlsx: 'Täze tablisa', pdf: 'Täze PDF' };
+        const defaultName = defaults[type] || 'Täze faýl';
+        UI.showModal('Täze faýl döret',
+            `<div class="form-group"><label>Faýlyň ady</label><input type="text" id="new-file-name" class="form-control" placeholder="${UI.esc(defaultName)}" value="${UI.esc(defaultName)}"></div>
+             <div class="new-file-type-badge"><span class="file-type-label">${type.toUpperCase()}</span></div>`,
+            `<button class="btn btn-ghost" onclick="UI.closeModal()">Ýatyrmak</button><button class="btn btn-primary" onclick="FilesPage.doCreateNewFile('${type}')">Döret</button>`);
+        setTimeout(() => { const i = document.getElementById('new-file-name'); if (i) { i.focus(); i.select(); } }, 100);
+    },
+
+    async doCreateNewFile(type) {
+        const name = document.getElementById('new-file-name')?.value.trim();
+        if (!name) { UI.toast('Faýl adyny giriziň', 'error'); return; }
+        try {
+            const file = await API.files.createBlank(name, type, this.currentScope, this.currentFolder);
+            UI.closeModal();
+            UI.toast('Faýl döredildi', 'success');
+            this.loadFiles();
+            App.loadStorageUsage();
+            // Open the file in editor if it's an editable document
+            if (type === 'docx' || type === 'xlsx') {
+                setTimeout(() => EditorPage.open(file.id, file.name), 500);
+            }
+        } catch (e) { UI.toast(e.message || 'Faýl döredip bolmady', 'error'); }
     },
 
 };
